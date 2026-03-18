@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FalconX Leadership Engine — Installation Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#0a0e1a;--surface:#f4f6fb;--white:#ffffff;--primary:#1a3fce;--primary-light:#e8edff;--primary-mid:#c0ccff;--accent:#00c6a2;--accent-light:#e0faf5;--warn:#e8560a;--warn-light:#fff1eb;--success:#0e8a5f;--success-light:#e6f7f1;--muted:#6b7694;--border:#dde2f0;--border-dark:#c4cce0;--card:#ffffff;--code-bg:#0d1117;--num-size:52px;--radius:14px;--shadow:0 4px 24px rgba(10,14,40,0.09);--shadow-lg:0 12px 48px rgba(10,14,40,0.13)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Lato',sans-serif;background:var(--surface);color:var(--ink);font-size:15px;line-height:1.7}
+.topbar{background:var(--ink);color:rgba(255,255,255,0.5);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.5px;padding:8px 40px;display:flex;justify-content:space-between;align-items:center}
+.topbar .tag{background:rgba(0,198,162,0.2);color:#00c6a2;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.hero{background:var(--ink);color:var(--white);padding:72px 60px 64px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:0;right:0;bottom:0;left:0;background:radial-gradient(ellipse 700px 400px at 80% 50%,rgba(26,63,206,0.35) 0%,transparent 70%),radial-gradient(ellipse 400px 300px at 10% 80%,rgba(0,198,162,0.15) 0%,transparent 60%);pointer-events:none}
+.hero::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hero-inner{position:relative;z-index:1;max-width:900px}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:30px;padding:5px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#00c6a2;margin-bottom:28px}
+.hero-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:#00c6a2;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(36px,5vw,58px);font-weight:800;line-height:1.08;letter-spacing:-1.5px;margin-bottom:20px}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,#3b6fff,#00c6a2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-desc{font-size:16px;color:rgba(255,255,255,0.65);max-width:600px;line-height:1.8;margin-bottom:40px}
+.hero-pills{display:flex;gap:12px;flex-wrap:wrap}
+.pill{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 20px;font-size:13px;display:flex;align-items:center;gap:8px}
+.pill-icon{font-size:16px}
+.pill-label{color:rgba(255,255,255,0.5);font-size:11px;display:block}
+.pill-val{color:white;font-weight:700;font-size:14px;display:block;font-family:'Syne',sans-serif}
+.progress-nav{background:var(--white);border-bottom:2px solid var(--border);padding:0 60px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(10,14,40,0.06)}
+.progress-nav-inner{display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+.progress-nav-inner::-webkit-scrollbar{display:none}
+.nav-step{padding:16px 22px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;text-decoration:none;color:var(--muted);letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;display:flex;align-items:center;gap:7px}
+.nav-step:hover{color:var(--primary);border-color:var(--primary-mid)}
+.nav-step .n{width:20px;height:20px;border-radius:50%;background:var(--surface);color:var(--muted);font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
+.page{max-width:980px;margin:0 auto;padding:60px 40px 80px}
+.sec-header{margin-bottom:36px;padding-bottom:20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:18px}
+.sec-icon{width:52px;height:52px;min-width:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.sec-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--primary);font-weight:600;margin-bottom:4px}
+.sec-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;letter-spacing:-0.5px;color:var(--ink)}
+.sec-sub{font-size:14px;color:var(--muted);margin-top:4px}
+.overview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:56px}
+.ov-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
+.ov-num{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;color:var(--primary);line-height:1;margin-bottom:6px}
+.ov-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:6px}
+.ov-desc{font-size:13px;color:var(--muted);line-height:1.6}
+.zip-explorer{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:56px}
+.zip-titlebar{background:#1c2333;padding:12px 18px;display:flex;align-items:center;gap:10px}
+.dot-r{width:12px;height:12px;border-radius:50%;background:#ff5f57}
+.dot-y{width:12px;height:12px;border-radius:50%;background:#febc2e}
+.dot-g{width:12px;height:12px;border-radius:50%;background:#28c840}
+.zip-titlebar-name{color:rgba(255,255,255,0.6);font-family:'IBM Plex Mono',monospace;font-size:12px;margin-left:6px}
+.zip-body{padding:24px 28px}
+.zip-tree{font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:2}
+.zip-folder{color:#3b6fff;font-weight:600}
+.zip-file{color:var(--ink)}
+.zip-file.imp{color:#00c6a2;font-weight:600}
+.zip-file.env{color:#e8560a}
+.zip-indent-1{padding-left:24px}
+.zip-indent-2{padding-left:48px}
+.zip-indent-3{padding-left:72px}
+.zip-badge{display:inline-block;margin-left:10px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:1px 7px;border-radius:4px;vertical-align:middle}
+.zb-key{background:#fff0e6;color:#c0430a}
+.zb-imp{background:#e0faf5;color:#0e8a5f}
+.zb-skip{background:#f0f0f0;color:#888}
+.steps-wrap{display:flex;flex-direction:column;gap:0;margin-bottom:56px}
+.step-row{display:flex;gap:0;position:relative}
+.step-left{display:flex;flex-direction:column;align-items:center;width:80px;min-width:80px;padding-top:4px}
+.step-circle{width:var(--num-size);height:var(--num-size);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:white;flex-shrink:0;position:relative;z-index:1;box-shadow:0 4px 16px rgba(0,0,0,0.15)}
+.step-line-v{width:2px;flex:1;min-height:32px;background:var(--border);margin-top:8px}
+.step-row:last-child .step-line-v{display:none}
+.step-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin:0 0 28px 20px;flex:1;box-shadow:var(--shadow)}
+.step-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+.step-title{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;letter-spacing:-0.3px;color:var(--ink)}
+.step-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;white-space:nowrap}
+.tag-time{background:#f0f4ff;color:var(--primary)}
+.tag-critical{background:#fff0e6;color:var(--warn)}
+.tag-skip{background:#f5f5f5;color:#888}
+.step-desc{font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.75}
+.mockup-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:18px 0;box-shadow:0 6px 24px rgba(10,14,40,0.1)}
+.mockup-bar{background:#e8eaf0;padding:9px 14px;display:flex;align-items:center;gap:6px}
+.m-dot{width:11px;height:11px;border-radius:50%}
+.md-r{background:#ff5f57}.md-y{background:#febc2e}.md-g{background:#28c840}
+.mockup-bar-title{flex:1;text-align:center;font-size:12px;color:#666;font-family:'IBM Plex Mono',monospace}
+.win-explorer{background:#f3f3f3;border:1px solid #d4d4d4;border-radius:6px;overflow:hidden;font-size:13px}
+.win-toolbar{background:linear-gradient(#f5f5f5,#ebebeb);border-bottom:1px solid #d0d0d0;padding:6px 12px;display:flex;align-items:center;gap:8px}
+.win-addr{background:white;border:1px solid #bbb;border-radius:3px;padding:3px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#333;flex:1}
+.win-files{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:4px;padding:12px;background:white}
+.win-file{display:flex;flex-direction:column;align-items:center;padding:8px 6px;border-radius:4px;cursor:pointer;text-align:center}
+.win-file:hover{background:#cfe2ff}
+.win-file.selected{background:#cfe2ff;outline:1px solid #3b6fff}
+.win-file-icon{font-size:28px;margin-bottom:4px}
+.win-file-name{font-size:11px;color:#333;word-break:break-word}
+.terminal{background:#0d1117;border-radius:10px;overflow:hidden;margin:16px 0;font-family:'IBM Plex Mono',monospace;font-size:12.5px;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.term-bar{background:#1c2333;padding:10px 16px;display:flex;align-items:center;gap:7px}
+.term-dots{display:flex;gap:6px}
+.td{width:11px;height:11px;border-radius:50%}
+.td-r{background:#ff5f57}.td-y{background:#febc2e}.td-g{background:#28c840}
+.term-title{flex:1;text-align:center;color:rgba(255,255,255,0.4);font-size:11px}
+.term-body{padding:18px 20px;line-height:1.85;min-height:80px}
+.t-prompt{color:#00c6a2}.t-cmd{color:#79b8ff}.t-path{color:#85e89d}
+.t-comment{color:#4a5568}.t-output{color:#8b9abf}
+.t-success{color:#00c6a2}.t-warn{color:#ffab70}.t-error{color:#f97583}
+.browser{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:16px 0;box-shadow:0 6px 24px rgba(10,14,40,0.1)}
+.browser-bar{background:#f0f2f7;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.browser-dots{display:flex;gap:6px}
+.bd{width:11px;height:11px;border-radius:50%}
+.bd-r{background:#ff5f57}.bd-y{background:#febc2e}.bd-g{background:#28c840}
+.browser-addr-bar{flex:1;background:white;border:1px solid var(--border);border-radius:20px;padding:5px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#555;display:flex;align-items:center;gap:6px}
+.browser-content{background:#f8f9ff;padding:32px;min-height:200px;display:flex;align-items:center;justify-content:center}
+.login-preview{background:white;border-radius:16px;padding:36px 40px;width:340px;box-shadow:0 8px 40px rgba(10,14,40,0.12);text-align:center}
+.login-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--ink);margin-bottom:4px}
+.login-logo span{color:var(--primary)}
+.login-sub{font-size:12px;color:var(--muted);margin-bottom:24px}
+.login-field{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);text-align:left;margin-bottom:10px}
+.login-btn{background:var(--primary);color:white;border-radius:8px;padding:11px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;width:100%;margin-top:4px}
+.alert{border-radius:10px;padding:14px 18px;font-size:13.5px;margin:14px 0;display:flex;gap:12px;align-items:flex-start;line-height:1.65}
+.alert-icon{font-size:17px;flex-shrink:0;margin-top:1px}
+.alert.info{background:var(--primary-light);border-left:4px solid var(--primary);color:#1a2f80}
+.alert.success{background:var(--success-light);border-left:4px solid var(--success);color:#065f46}
+.alert.warn{background:var(--warn-light);border-left:4px solid var(--warn);color:#7c2d12}
+.alert.note{background:#fffbeb;border-left:4px solid #d97706;color:#78350f}
+.alert strong{display:block;margin-bottom:2px}
+.detail-list{list-style:none;margin:12px 0}
+.detail-list li{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.detail-list li:last-child{border-bottom:none}
+.dl-num{width:26px;height:26px;min-width:26px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif}
+.dl-text{color:var(--ink);flex:1;line-height:1.6}
+.dl-text code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--primary)}
+.happens-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0}
+.happens-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}
+.h-step-num{width:28px;height:28px;min-width:28px;border-radius:8px;background:var(--ink);color:white;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.h-step-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.h-step-desc{font-size:12px;color:var(--muted)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+.verify-table{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:56px;box-shadow:var(--shadow)}
+.verify-table table{width:100%;border-collapse:collapse}
+.verify-table th{background:var(--ink);color:rgba(255,255,255,0.8);padding:14px 18px;text-align:left;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.verify-table td{padding:14px 18px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle}
+.verify-table tr:last-child td{border-bottom:none}
+.verify-table tr:hover td{background:var(--surface)}
+.verify-table code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--code-bg);color:#79b8ff;padding:3px 8px;border-radius:5px}
+.status-dot{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot-ok{background:#22c55e}.dot-warn{background:#f59e0b}
+.trouble-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-bottom:56px}
+.trouble-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.trouble-head{background:var(--warn-light);border-bottom:1px solid #fcd9c0;padding:14px 18px;display:flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;font-size:13.5px;font-weight:700;color:var(--warn)}
+.trouble-body{padding:16px 18px}
+.trouble-cause{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.6}
+.checklist-wrap{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-bottom:56px;box-shadow:var(--shadow)}
+.cl-group-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--primary-light)}
+.cl-group-title:first-child{margin-top:0}
+.cl-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.cl-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border-radius:8px;font-size:13.5px;border:1px solid transparent}
+.cl-item:hover{border-color:var(--primary-mid);background:var(--primary-light)}
+.cl-box{width:18px;height:18px;min-width:18px;border:2px solid var(--border-dark);border-radius:4px;background:white}
+.cl-text code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:white;border:1px solid var(--border);border-radius:4px;padding:0 5px;color:var(--primary)}
+.quickref{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:56px}
+.qr-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.qr-head{padding:12px 18px;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px}
+.qr-body{padding:14px 18px;font-size:13px;line-height:1.9}
+.qr-body code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--primary)}
+footer{background:var(--ink);color:rgba(255,255,255,0.4);padding:32px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:12px;font-family:'IBM Plex Mono',monospace}
+footer strong{color:rgba(255,255,255,0.7)}
+footer a{color:#3b6fff;text-decoration:none}
+.c1{background:linear-gradient(135deg,#1a3fce,#3b6fff)}
+.c2{background:linear-gradient(135deg,#0e8a5f,#00c6a2)}
+.c3{background:linear-gradient(135deg,#b45309,#e8560a)}
+.c4{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+.c5{background:linear-gradient(135deg,#be185d,#ec4899)}
+.spacer{margin-bottom:56px}
+kbd{background:#f0f0f0;border:1px solid #ccc;border-radius:4px;padding:1px 7px;font-size:12px;font-family:'IBM Plex Mono',monospace}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>CDK Global &nbsp;·&nbsp; Internal Distribution Only &nbsp;·&nbsp; March 2026</div>
+  <div class="tag">v2.1 — Windows Setup</div>
+</div>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Installation Guide</div>
+    <h1>FalconX<br><em>Leadership Engine</em></h1>
+    <p class="hero-desc">A complete step-by-step guide to extracting, configuring, and running the FalconX application on your Windows machine — from ZIP file to a live browser session in under 25 minutes.</p>
+    <div class="hero-pills">
+      <div class="pill"><span class="pill-icon">⏱</span><div><span class="pill-label">Total Setup Time</span><span class="pill-val">~25 Minutes</span></div></div>
+      <div class="pill"><span class="pill-icon">💻</span><div><span class="pill-label">Platform</span><span class="pill-val">Windows 10/11</span></div></div>
+      <div class="pill"><span class="pill-icon">🌐</span><div><span class="pill-label">Ports Required</span><span class="pill-val">3000 &amp; 8000</span></div></div>
+      <div class="pill"><span class="pill-icon">🚀</span><div><span class="pill-label">Automation</span><span class="pill-val">start.bat included</span></div></div>
+    </div>
+  </div>
+</div>
+
+<nav class="progress-nav">
+  <div class="progress-nav-inner">
+    <a href="#prereqs" class="nav-step"><span class="n">0</span> Prerequisites</a>
+    <a href="#extract" class="nav-step"><span class="n">1</span> Extract ZIP</a>
+    <a href="#explore" class="nav-step"><span class="n">2</span> Project Structure</a>
+    <a href="#env" class="nav-step"><span class="n">3</span> Configure .env</a>
+    <a href="#startbat" class="nav-step"><span class="n">4</span> Run start.bat</a>
+    <a href="#verify" class="nav-step"><span class="n">5</span> Verify &amp; Login</a>
+    <a href="#troubleshoot" class="nav-step"><span class="n">6</span> Troubleshoot</a>
+  </div>
+</nav>
+
+<div class="page">
+
+<!-- OVERVIEW -->
+<div class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#e8edff;">📋</div>
+    <div>
+      <div class="sec-label">Overview</div>
+      <div class="sec-title">What You Are Installing</div>
+      <div class="sec-sub">FalconX is a two-part application — a Next.js frontend and a Python FastAPI backend — that run simultaneously on your local machine and connect to CDK internal systems.</div>
+    </div>
+  </div>
+  <div class="overview-grid">
+    <div class="ov-card">
+      <div class="ov-num">01</div>
+      <div class="ov-title">🖥️ Next.js Frontend</div>
+      <div class="ov-desc">The visual interface in your browser. Runs on <strong>localhost:3000</strong>. Handles login, dashboards, Jira views, AI chat, and all user interactions.</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-num">02</div>
+      <div class="ov-title">⚙️ FastAPI Backend</div>
+      <div class="ov-desc">The engine behind the scenes. Runs on <strong>localhost:8000</strong>. Connects to Jira, Confluence, LDAP, GitHub, and the Databricks AI/RAG pipeline.</div>
+    </div>
+    <div class="ov-card">
+      <div class="ov-num">03</div>
+      <div class="ov-title">🚀 start.bat</div>
+      <div class="ov-desc">A Windows batch script included in the ZIP. It <strong>automates everything</strong> — virtual environment, dependency installation, and launching both servers with a single double-click.</div>
+    </div>
+  </div>
+  <div class="alert info">
+    <span class="alert-icon">💡</span>
+    <div><strong>How it works:</strong> The frontend (browser tab) talks to the backend (running locally). The backend connects to CDK's Jira, Confluence, LDAP, and AI systems. Both servers must remain running at all times for the application to function.</div>
+  </div>
+</div>
+
+<!-- STEP 0 — PREREQUISITES -->
+<div id="prereqs" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#e0faf5;">✅</div>
+    <div>
+      <div class="sec-label">Step 0</div>
+      <div class="sec-title">Prerequisites — Complete Before Anything Else</div>
+      <div class="sec-sub">Three tools must be installed and accessible before setup will succeed. Open <strong>Command Prompt</strong> (<kbd>Win + R</kbd> → type <kbd>cmd</kbd> → Enter) and verify each one.</div>
+    </div>
+  </div>
+  <div class="steps-wrap">
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c2">🐍</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Python 3.11 or higher</div><span class="step-tag tag-critical">Required</span></div>
+        <div class="step-desc">Python powers the backend server. Version 3.11 or newer is required. Run the following in Command Prompt to verify:</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">Command Prompt</div></div>
+          <div class="term-body">
+            <div><span class="t-prompt">C:\Users\You&gt;</span> <span class="t-cmd">python --version</span></div>
+            <div><span class="t-success">Python 3.11.8</span> &nbsp;<span class="t-comment">← Anything 3.11 or above is fine ✓</span></div>
+          </div>
+        </div>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>If you see an error or a version below 3.11:</strong> Download the latest Python installer from <strong>python.org/downloads</strong>. During installation, tick the checkbox <em>"Add Python to PATH"</em> — this step is essential or the command will not be found. Restart Command Prompt after installation.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c1">🟢</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Node.js 18 LTS or higher</div><span class="step-tag tag-critical">Required</span></div>
+        <div class="step-desc">Node.js is required to run the Next.js frontend. In the same Command Prompt window, run:</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">Command Prompt</div></div>
+          <div class="term-body">
+            <div><span class="t-prompt">C:\Users\You&gt;</span> <span class="t-cmd">node --version</span></div>
+            <div><span class="t-success">v20.11.0</span> &nbsp;<span class="t-comment">← v18 or above is fine ✓</span></div>
+            <div style="margin-top:4px;"><span class="t-prompt">C:\Users\You&gt;</span> <span class="t-cmd">npm --version</span></div>
+            <div><span class="t-success">10.2.4</span> &nbsp;<span class="t-comment">← npm ships bundled with Node.js ✓</span></div>
+          </div>
+        </div>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>If Node.js is missing:</strong> Download the <strong>LTS version</strong> from <strong>nodejs.org</strong>. Run the installer with default settings. Close and reopen Command Prompt after installation, then re-run both version checks.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c4">🔐</div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">CDK VPN / Network Access</div><span class="step-tag tag-critical">Required for Jira &amp; Login</span></div>
+        <div class="step-desc">FalconX connects to internal CDK systems that are only accessible on the CDK network or via VPN. Confirm connectivity:</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">Command Prompt</div></div>
+          <div class="term-body">
+            <div><span class="t-prompt">C:\Users\You&gt;</span> <span class="t-cmd">ping projects.cdk.com</span></div>
+            <div><span class="t-success">Reply from 10.x.x.x: bytes=32 time=12ms TTL=128</span> &nbsp;<span class="t-comment">← Connected ✓</span></div>
+          </div>
+        </div>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>If the ping times out or says "could not find host":</strong> You are not on the CDK network. Connect to the CDK VPN before continuing. Contact IT if you do not have VPN access credentials.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 1 — EXTRACT ZIP -->
+<div id="extract" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#fff1eb;">📦</div>
+    <div>
+      <div class="sec-label">Step 1</div>
+      <div class="sec-title">Extract the ZIP File</div>
+      <div class="sec-sub">You should have received <strong>Leadership_Engine_Dev-main.zip</strong> from Ramesh. Extracting it correctly is critical — files run directly from inside a ZIP will cause errors.</div>
+    </div>
+  </div>
+  <div class="steps-wrap">
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c3">1</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Locate the ZIP file in your Downloads folder</div><span class="step-tag tag-time">~30 sec</span></div>
+        <div class="step-desc">Open File Explorer and navigate to your <strong>Downloads</strong> folder (or wherever you saved the file from Ramesh). You should see it highlighted below:</div>
+        <div class="mockup-wrap">
+          <div class="mockup-bar"><div class="m-dot md-r"></div><div class="m-dot md-y"></div><div class="m-dot md-g"></div><div class="mockup-bar-title">📁 File Explorer — Downloads</div></div>
+          <div style="padding:12px;background:#fff;">
+            <div class="win-explorer">
+              <div class="win-toolbar"><div class="win-addr">C:\Users\YourName\Downloads</div></div>
+              <div class="win-files">
+                <div class="win-file selected"><div class="win-file-icon">🗜️</div><div class="win-file-name">Leadership_Engine_Dev-main.zip</div></div>
+                <div class="win-file"><div class="win-file-icon">📄</div><div class="win-file-name">report.pdf</div></div>
+                <div class="win-file"><div class="win-file-icon">📁</div><div class="win-file-name">Projects</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="alert note"><span class="alert-icon">📌</span><div><strong>Don't have the ZIP?</strong> Contact Ramesh at <a href="mailto:ajith.ramesh@cdk.com" style="color:#1a3fce;">ajith.ramesh@cdk.com</a> to receive the latest project file.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c3">2</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Right-click → Extract All to C:\Projects\</div><span class="step-tag tag-time">~1 min</span></div>
+        <div class="step-desc">Never run files from inside an unopened ZIP — this causes installation errors. You must extract it fully first:</div>
+        <ul class="detail-list">
+          <li><div class="dl-num">1</div><div class="dl-text"><strong>Right-click</strong> the ZIP file and select <strong>"Extract All…"</strong> from the context menu.</div></li>
+          <li><div class="dl-num">2</div><div class="dl-text">When the dialog opens, click <strong>Browse</strong> and navigate to <code>C:\Projects\</code>. If this folder doesn't exist, create it. Click <strong>Select Folder</strong>.</div></li>
+          <li><div class="dl-num">3</div><div class="dl-text">Ensure <strong>"Show extracted files when complete"</strong> is ticked, then click <strong>Extract</strong>.</div></li>
+          <li><div class="dl-num">4</div><div class="dl-text">Windows will extract all files. A new File Explorer window opens automatically when it is done.</div></li>
+        </ul>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>Avoid spaces in the extraction path.</strong> Do not extract to <code>C:\My Documents\My Projects\</code> — spaces in folder names can break the Python virtual environment. Use <code>C:\Projects\</code> or <code>C:\Dev\</code> instead.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c3">3</div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Confirm the extracted folder contents</div><span class="step-tag tag-time">~30 sec</span></div>
+        <div class="step-desc">Open the extracted folder <strong>Leadership_Engine_Dev-main</strong>. You should see these items — if they are all present, the extraction was successful:</div>
+        <div class="mockup-wrap">
+          <div class="mockup-bar"><div class="m-dot md-r"></div><div class="m-dot md-y"></div><div class="m-dot md-g"></div><div class="mockup-bar-title">📁 File Explorer — C:\Projects\Leadership_Engine_Dev-main</div></div>
+          <div style="padding:12px;background:#fff;">
+            <div class="win-explorer">
+              <div class="win-toolbar"><div class="win-addr">C:\Projects\Leadership_Engine_Dev-main</div></div>
+              <div class="win-files">
+                <div class="win-file"><div class="win-file-icon">📁</div><div class="win-file-name">backend</div></div>
+                <div class="win-file"><div class="win-file-icon">📁</div><div class="win-file-name">frontend</div></div>
+                <div class="win-file"><div class="win-file-icon">📁</div><div class="win-file-name">logs</div></div>
+                <div class="win-file selected"><div class="win-file-icon">⚙️</div><div class="win-file-name">start.bat</div></div>
+                <div class="win-file"><div class="win-file-icon">⚙️</div><div class="win-file-name">RESTART_BACKEND.bat</div></div>
+                <div class="win-file"><div class="win-file-icon">📄</div><div class="win-file-name">README.md</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="alert success"><span class="alert-icon">✅</span><div><strong>Extraction successful</strong> if you can see the <strong>backend</strong> folder, <strong>frontend</strong> folder, and <strong>start.bat</strong> file at this level. If you only see a single folder inside another folder, go one level deeper until you reach this structure.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2 — PROJECT STRUCTURE -->
+<div id="explore" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#ede9fe;">🗂️</div>
+    <div>
+      <div class="sec-label">Step 2</div>
+      <div class="sec-title">Understanding the Project Structure</div>
+      <div class="sec-sub">Before making any changes, familiarise yourself with what each folder contains. You only need to create or edit one file — <code>backend/config/.env</code> — everything else is handled automatically.</div>
+    </div>
+  </div>
+  <div class="zip-explorer">
+    <div class="zip-titlebar"><div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div><div class="zip-titlebar-name">Leadership_Engine_Dev-main / Complete Project Structure</div></div>
+    <div class="zip-body">
+      <div class="zip-tree">
+        <div><span class="zip-folder">📁 Leadership_Engine_Dev-main/</span></div>
+        <div class="zip-indent-1"><span class="zip-folder">📁 backend/</span> <span style="color:var(--muted);font-size:11px;">— Python FastAPI server code</span></div>
+        <div class="zip-indent-2"><span class="zip-folder">📁 config/</span></div>
+        <div class="zip-indent-3"><span class="zip-file env">📄 env.template</span> <span class="zip-badge zb-key">Start here</span> <span style="color:var(--muted);font-size:11px;">— Copy this file to create your .env</span></div>
+        <div class="zip-indent-3"><span class="zip-file env">📄 .env</span> <span class="zip-badge zb-key">You create this</span> <span style="color:var(--muted);font-size:11px;">— Your personal credentials — NOT included in ZIP</span></div>
+        <div class="zip-indent-2"><span class="zip-folder">📁 scripts/</span></div>
+        <div class="zip-indent-3"><span class="zip-file imp">📄 generate_env.py</span> <span class="zip-badge zb-imp">Encryption tool</span> <span style="color:var(--muted);font-size:11px;">— Encrypts passwords before storing in .env</span></div>
+        <div class="zip-indent-2"><span class="zip-file">📄 requirements.txt</span> <span style="color:var(--muted);font-size:11px;">— Python package list (auto-installed by start.bat)</span></div>
+        <div class="zip-indent-2"><span class="zip-file">📄 run_server.py</span> <span style="color:var(--muted);font-size:11px;">— Starts the FastAPI server (called automatically by start.bat)</span></div>
+        <div class="zip-indent-2"><span class="zip-file">📄 main.py</span> <span style="color:var(--muted);font-size:11px;">— Main API application source code</span></div>
+        <div class="zip-indent-1" style="margin-top:8px;"><span class="zip-folder">📁 frontend/</span> <span style="color:var(--muted);font-size:11px;">— Next.js user interface code</span></div>
+        <div class="zip-indent-2"><span class="zip-folder">📁 src/</span> <span style="color:var(--muted);font-size:11px;">— React components and page layouts</span></div>
+        <div class="zip-indent-2"><span class="zip-file">📄 package.json</span> <span style="color:var(--muted);font-size:11px;">— Node.js package list (auto-installed by start.bat)</span></div>
+        <div class="zip-indent-2"><span class="zip-file">📄 next.config.js</span> <span style="color:var(--muted);font-size:11px;">— Next.js framework configuration</span></div>
+        <div class="zip-indent-2"><span class="zip-file env">📄 .env.local</span> <span class="zip-badge zb-skip">Optional</span> <span style="color:var(--muted);font-size:11px;">— Only needed if backend is NOT running on localhost:8000</span></div>
+        <div class="zip-indent-1" style="margin-top:8px;"><span class="zip-folder">📁 logs/</span> <span style="color:var(--muted);font-size:11px;">— Server output logs (auto-created on first run)</span></div>
+        <div class="zip-indent-2"><span class="zip-file">📄 backend-dev.log</span> &nbsp; <span class="zip-file">📄 frontend-dev.log</span></div>
+        <div class="zip-indent-1" style="margin-top:8px;"><span class="zip-file imp">⚙️ start.bat</span> <span class="zip-badge zb-imp">Run this</span> <span style="color:var(--muted);font-size:11px;">— One-click launcher for Windows. Installs dependencies and starts both servers.</span></div>
+        <div class="zip-indent-1"><span class="zip-file">⚙️ RESTART_BACKEND.bat</span> <span style="color:var(--muted);font-size:11px;">— Restarts only the backend (use after editing .env)</span></div>
+        <div class="zip-indent-1"><span class="zip-file">📄 README.md</span> <span style="color:var(--muted);font-size:11px;">— Quick reference documentation</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="alert info"><span class="alert-icon">💡</span><div><strong>Only one file requires your input:</strong> <code>backend/config/.env</code> — your personal credentials file. You will create this in Step 3. Everything else is automated by <code>start.bat</code>.</div></div>
+</div>
+
+<!-- STEP 3 — CONFIGURE .ENV -->
+<div id="env" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#ffedd5;">🔑</div>
+    <div>
+      <div class="sec-label">Step 3</div>
+      <div class="sec-title">Configure Your .env Credentials File</div>
+      <div class="sec-sub">This is the only step requiring your personal information. Complete this <strong>before</strong> running start.bat. The <code>.env</code> file tells the backend how to connect to Jira, LDAP, and Databricks.</div>
+    </div>
+  </div>
+  <div class="steps-wrap">
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c5">A</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Copy the template to create your .env file</div><span class="step-tag tag-time">~1 min</span></div>
+        <div class="step-desc">Navigate to <code>backend\config\</code> inside your extracted project. You will see a file named <strong>env.template</strong>. Make a copy and rename it exactly <strong>.env</strong>.</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">Command Prompt — run from project root</div></div>
+          <div class="term-body">
+            <div><span class="t-comment"># Navigate into the config folder</span></div>
+            <div><span class="t-prompt">C:\Projects\Leadership_Engine_Dev-main&gt;</span> <span class="t-cmd">cd backend\config</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Copy the template to create .env</span></div>
+            <div><span class="t-prompt">C:\...\backend\config&gt;</span> <span class="t-cmd">copy env.template .env</span></div>
+            <div><span class="t-success">        1 file(s) copied.</span></div>
+          </div>
+        </div>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>Windows may append .txt to the filename.</strong> If the file appears as <code>.env.txt</code> in Explorer, go to View → Options → uncheck "Hide extensions for known file types", then rename to remove the <code>.txt</code>. The file must be named exactly <code>.env</code> with no other extension.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c5">B</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Open .env in VS Code or Notepad and fill in your values</div><span class="step-tag tag-time">~5 min</span></div>
+        <div class="step-desc">Open the <code>.env</code> file and fill in each value. Your CDK email and Jira API token are your own — Ramesh provides the Databricks details, LDAP service account credentials, and the shared ENCRYPTION_KEY.</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">backend/config/.env — fill in each value</div></div>
+          <div class="term-body" style="font-size:12px;">
+            <div><span class="t-comment"># ── SESSION ─────────────────────────────────────────────────</span></div>
+            <div><span style="color:#ffab70;">SESSION_SECRET_KEY</span>=<span style="color:#f97583;">any-random-string-minimum-32-characters-long</span></div>
+            <div style="margin-top:8px;"><span class="t-comment"># ── JIRA ─────────────────────────────────────────────────────</span></div>
+            <div><span style="color:#ffab70;">JIRA_BASE_URL</span>=<span style="color:#f97583;">https://projects.cdk.com</span></div>
+            <div><span style="color:#ffab70;">JIRA_SERVICE_EMAIL</span>=<span style="color:#f97583;">yourname@cdk.com</span></div>
+            <div><span style="color:#ffab70;">JIRA_SERVICE_API_TOKEN</span>=<span style="color:#f97583;">encrypted:xxxx</span> <span class="t-comment">← see step C below</span></div>
+            <div style="margin-top:8px;"><span class="t-comment"># ── CONFLUENCE ───────────────────────────────────────────────</span></div>
+            <div><span style="color:#ffab70;">CONFLUENCE_BASE_URL</span>=<span style="color:#f97583;">https://confluence.cdk.com</span></div>
+            <div><span style="color:#ffab70;">CONFLUENCE_SERVICE_EMAIL</span>=<span style="color:#f97583;">yourname@cdk.com</span></div>
+            <div><span style="color:#ffab70;">CONFLUENCE_SERVICE_API_TOKEN</span>=<span style="color:#f97583;">encrypted:xxxx</span> <span class="t-comment">← same token as Jira</span></div>
+            <div style="margin-top:8px;"><span class="t-comment"># ── LDAP / ACTIVE DIRECTORY ──────────────────────────────────</span></div>
+            <div><span style="color:#ffab70;">LDAP_SERVER_URL</span>=<span style="color:#f97583;">ldaps://ORDPGBLADC01.global.cdk.com:636</span></div>
+            <div><span style="color:#ffab70;">LDAP_SERVICE_ACCOUNT_USERNAME</span>=<span style="color:#f97583;">global\SVC_FalconX</span> <span class="t-comment">← from Ramesh</span></div>
+            <div><span style="color:#ffab70;">LDAP_SERVICE_ACCOUNT_PASSWORD</span>=<span style="color:#f97583;">encrypted:xxxx</span> <span class="t-comment">← from Ramesh pre-encrypted</span></div>
+            <div style="margin-top:8px;"><span class="t-comment"># ── DATABRICKS / AI ──────────────────────────────────────────</span></div>
+            <div><span style="color:#ffab70;">OPENAI_API_KEY</span>=<span style="color:#f97583;">dapi_xxxxxxxxxxxxxxxx</span> <span class="t-comment">← Databricks token from Ramesh</span></div>
+            <div><span style="color:#ffab70;">OPENAI_API_ENDPOINT</span>=<span style="color:#f97583;">https://dbc-xxx.cloud.databricks.com/...</span></div>
+            <div><span style="color:#ffab70;">OPENAI_MODEL</span>=<span style="color:#f97583;">databricks-gpt-5-1</span> <span class="t-comment">← confirm model name with Ramesh</span></div>
+            <div><span style="color:#ffab70;">DATABRICKS_WORKSPACE_URL</span>=<span style="color:#f97583;">https://dbc-xxx.cloud.databricks.com</span></div>
+          </div>
+        </div>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>Never commit this file to Git.</strong> The <code>.env</code> file contains sensitive credentials. It is listed in <code>.gitignore</code> by default — never manually add or force-push it to any repository.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c5">C</div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Encrypt your passwords using generate_env.py</div><span class="step-tag tag-time">~3 min</span></div>
+        <div class="step-desc">FalconX does not store plain-text passwords. Use the included encryption script to convert your Jira API token into an encrypted value. You need the shared <strong>ENCRYPTION_KEY</strong> from Ramesh first.</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">Command Prompt — from the backend folder</div></div>
+          <div class="term-body">
+            <div><span class="t-comment"># Navigate back to the backend folder</span></div>
+            <div><span class="t-prompt">C:\...\config&gt;</span> <span class="t-cmd">cd ..</span></div>
+            <div style="margin-top:4px;"><span class="t-comment"># Activate the Python virtual environment</span></div>
+            <div><span class="t-prompt">C:\...\backend&gt;</span> <span class="t-cmd">venv\Scripts\activate</span></div>
+            <div><span class="t-success">(venv)</span> <span class="t-prompt">C:\...\backend&gt;</span> <span class="t-comment">← "(venv)" prefix confirms activation ✓</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Run the encryption tool</span></div>
+            <div><span class="t-success">(venv)</span> <span class="t-prompt">C:\...\backend&gt;</span> <span class="t-cmd">python scripts\generate_env.py</span></div>
+            <div><span class="t-output">Enter password or token to encrypt: </span><span class="t-warn">••••••••••••</span></div>
+            <div><span class="t-output">Your encrypted value:</span></div>
+            <div><span class="t-success">encrypted:gAAAAABl7xK3...    ← copy this entire string into .env</span></div>
+          </div>
+        </div>
+        <div class="alert info"><span class="alert-icon">🔐</span><div><strong>Run this once per credential.</strong> Encrypt your <strong>Jira API token</strong>, your <strong>Confluence API token</strong> (same as Jira if using Atlassian unified auth), and obtain the pre-encrypted LDAP password from Ramesh. Paste each <code>encrypted:...</code> value into the matching field in your <code>.env</code> file. All team members must use the same shared ENCRYPTION_KEY.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4 — RUN START.BAT -->
+<div id="startbat" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#e0faf5;">🚀</div>
+    <div>
+      <div class="sec-label">Step 4</div>
+      <div class="sec-title">Run start.bat — Launch the Application</div>
+      <div class="sec-sub">With your <code>.env</code> file complete, you are ready to start. <code>start.bat</code> installs all dependencies and launches both servers automatically.</div>
+    </div>
+  </div>
+  <div class="steps-wrap">
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c2">1</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Double-click start.bat from the project root folder</div><span class="step-tag tag-critical">Keep terminal open!</span></div>
+        <div class="step-desc">Open File Explorer, navigate to <strong>C:\Projects\Leadership_Engine_Dev-main\</strong>, and double-click <strong>start.bat</strong>. Or run it from the terminal:</div>
+        <div class="terminal">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">Command Prompt — project root</div></div>
+          <div class="term-body">
+            <div><span class="t-prompt">C:\Projects\Leadership_Engine_Dev-main&gt;</span> <span class="t-cmd">start.bat</span></div>
+          </div>
+        </div>
+        <div style="margin:16px 0 8px;font-weight:700;font-size:14px;font-family:'Syne',sans-serif;">What start.bat does automatically — in order:</div>
+        <div class="happens-grid">
+          <div class="happens-card"><div class="h-step-num">1</div><div><div class="h-step-title">Port Check</div><div class="h-step-desc">Detects and frees ports 3000 and 8000 if another process is using them.</div></div></div>
+          <div class="happens-card"><div class="h-step-num">2</div><div><div class="h-step-title">Python venv</div><div class="h-step-desc">Creates a Python virtual environment at <code style="font-size:10px;">backend\venv\</code> if it doesn't exist.</div></div></div>
+          <div class="happens-card"><div class="h-step-num">3</div><div><div class="h-step-title">pip install</div><div class="h-step-desc">Installs all Python packages from <code style="font-size:10px;">requirements.txt</code> into the venv.</div></div></div>
+          <div class="happens-card"><div class="h-step-num">4</div><div><div class="h-step-title">npm install</div><div class="h-step-desc">Installs all Node packages into <code style="font-size:10px;">frontend\node_modules\</code>.</div></div></div>
+          <div class="happens-card"><div class="h-step-num">5</div><div><div class="h-step-title">Backend starts</div><div class="h-step-desc">Launches FastAPI server on <code style="font-size:10px;">localhost:8000</code> in a new terminal window.</div></div></div>
+          <div class="happens-card"><div class="h-step-num">6</div><div><div class="h-step-title">Frontend starts</div><div class="h-step-desc">Builds and launches Next.js on <code style="font-size:10px;">localhost:3000</code>. Browser opens automatically.</div></div></div>
+        </div>
+        <div class="alert note"><span class="alert-icon">⏳</span><div><strong>First-time installation takes 5–10 minutes.</strong> Python and Node packages need to download on the first run. Subsequent runs are near-instant as packages are cached. Do not close any terminal windows during this process.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c2">2</div><div class="step-line-v"></div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Wait for both servers to report they are ready</div><span class="step-tag tag-critical">Both must be running</span></div>
+        <div class="step-desc">Two separate terminal windows will open — one for each server. Do not proceed until you see the ready messages in both windows:</div>
+        <div class="two-col">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Terminal Window 1 — Backend</div>
+            <div class="terminal">
+              <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">FalconX Backend</div></div>
+              <div class="term-body" style="font-size:11.5px;">
+                <div><span class="t-output">INFO: Loading .env credentials...</span></div>
+                <div><span class="t-output">INFO: Connecting to LDAP...</span></div>
+                <div><span class="t-output">INFO: Jira client initialised ✓</span></div>
+                <div><span class="t-output">INFO: Confluence client initialised ✓</span></div>
+                <div><span class="t-output">INFO: Databricks RAG ready ✓</span></div>
+                <div style="margin-top:4px;"><span class="t-success">INFO: Uvicorn running on</span></div>
+                <div><span class="t-success">     http://0.0.0.0:8000 ✓ READY</span></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Terminal Window 2 — Frontend</div>
+            <div class="terminal">
+              <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div><div class="term-title">FalconX Frontend</div></div>
+              <div class="term-body" style="font-size:11.5px;">
+                <div><span class="t-output">  ▲ Next.js 14.1.0</span></div>
+                <div><span class="t-output">  - Local:   http://localhost:3000</span></div>
+                <div><span class="t-output">  - Network: http://192.168.x.x:3000</span></div>
+                <div style="margin-top:4px;"><span class="t-success"> ✓ Ready in 3.2s</span></div>
+                <div><span class="t-success"> ✓ Compiled /page in 892ms</span></div>
+                <div style="margin-top:4px;"><span class="t-output">Opening browser...</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="alert warn"><span class="alert-icon">⚠️</span><div><strong>Never close either terminal window.</strong> Closing a window shuts down that server and the application will stop working. Minimise both windows — they must remain running throughout your entire session.</div></div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-left"><div class="step-circle c2">3</div></div>
+      <div class="step-card">
+        <div class="step-card-header"><div class="step-title">Your browser opens automatically to the FalconX login screen</div><span class="step-tag tag-time">~30 sec after start</span></div>
+        <div class="step-desc">Once both servers are ready, <code>start.bat</code> automatically opens your default browser to <strong>http://localhost:3000</strong>. You should see this login screen:</div>
+        <div class="browser">
+          <div class="browser-bar">
+            <div class="browser-dots"><div class="bd bd-r"></div><div class="bd bd-y"></div><div class="bd bd-g"></div></div>
+            <div class="browser-addr-bar"><span style="color:#0e8a5f;font-size:11px;">🔒</span> localhost:3000</div>
+          </div>
+          <div class="browser-content">
+            <div class="login-preview">
+              <div class="login-logo">Falcon<span>X</span></div>
+              <div class="login-sub">Leadership Engine &nbsp;·&nbsp; CDK Global</div>
+              <div class="login-field">👤 &nbsp;CDK Username (e.g. john.doe)</div>
+              <div class="login-field">🔒 &nbsp;•••••••••••••</div>
+              <div class="login-btn">Sign In with CDK Credentials</div>
+            </div>
+          </div>
+        </div>
+        <div class="alert success"><span class="alert-icon">✅</span><div><strong>You're in!</strong> Log in using your <strong>CDK Windows network credentials</strong> — the same username and password you use to sign in to your laptop each morning. Authentication is handled securely via LDAP/Active Directory. No separate account is needed.</div></div>
+        <div class="alert info" style="margin-top:8px;"><span class="alert-icon">💡</span><div>If the browser does not open automatically, open it manually and navigate to <code>http://localhost:3000</code></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 5 — VERIFY -->
+<div id="verify" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#e0faf5;">🔍</div>
+    <div>
+      <div class="sec-label">Step 5</div>
+      <div class="sec-title">Verify All Systems Are Connected</div>
+      <div class="sec-sub">After logging in, open these URLs in your browser to confirm each service is connected. Use them to diagnose issues if something is not working correctly.</div>
+    </div>
+  </div>
+  <div class="verify-table">
+    <table>
+      <thead>
+        <tr><th>Health Check</th><th>URL to Open</th><th>Expected Result</th><th>Priority</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Backend Health</strong></td>
+          <td><code>localhost:8000/health</code></td>
+          <td><code style="color:#85e89d;background:#0d1117;border:none;">{&quot;status&quot;:&quot;healthy&quot;}</code></td>
+          <td><span class="status-dot"><span class="dot dot-ok"></span>Check first</span></td>
+        </tr>
+        <tr>
+          <td><strong>Frontend Login</strong></td>
+          <td><code>localhost:3000</code></td>
+          <td>FalconX login screen loads correctly</td>
+          <td><span class="status-dot"><span class="dot dot-ok"></span>Check second</span></td>
+        </tr>
+        <tr>
+          <td><strong>API Documentation</strong></td>
+          <td><code>localhost:8000/docs</code></td>
+          <td>Swagger UI listing 60+ API endpoints</td>
+          <td><span class="status-dot"><span class="dot dot-warn"></span>Useful for debugging</span></td>
+        </tr>
+        <tr>
+          <td><strong>Jira Connection</strong></td>
+          <td><code>localhost:8000/api/jira/status</code></td>
+          <td><code style="color:#85e89d;background:#0d1117;border:none;">{&quot;connected&quot;:true}</code></td>
+          <td><span class="status-dot"><span class="dot dot-ok"></span>If Jira data is blank</span></td>
+        </tr>
+        <tr>
+          <td><strong>RAG / AI Health</strong></td>
+          <td><code>localhost:8000/api/rag/health</code></td>
+          <td>Databricks vector search status shown</td>
+          <td><span class="status-dot"><span class="dot dot-ok"></span>If AI chat fails</span></td>
+        </tr>
+        <tr>
+          <td><strong>End-to-End AI Test</strong></td>
+          <td>Frontend → Chat tab</td>
+          <td>Type "show me open bugs in current sprint" — receives Jira results in natural language</td>
+          <td><span class="status-dot"><span class="dot dot-warn"></span>Final validation</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- STEP 6 — TROUBLESHOOT -->
+<div id="troubleshoot" class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#fee2e2;">🔧</div>
+    <div>
+      <div class="sec-label">Step 6</div>
+      <div class="sec-title">Common Issues &amp; How to Fix Them</div>
+      <div class="sec-sub">If something goes wrong, match your error to one of the cases below. Always check the <code>logs/</code> folder first — the log files contain detailed error messages that pinpoint the exact cause.</div>
+    </div>
+  </div>
+  <div class="trouble-grid">
+    <div class="trouble-card">
+      <div class="trouble-head">❌ "python" is not recognised as a command</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">Python is not installed or was not added to PATH during installation. Try alternate commands first, then reinstall if needed.</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-comment"># Try these alternate commands:</span></div>
+            <div><span class="t-cmd">py --version</span></div>
+            <div><span class="t-cmd">python3 --version</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># If both fail: reinstall Python from python.org</span></div>
+            <div><span class="t-comment"># Tick "Add Python to PATH" during install</span></div>
+            <div><span class="t-comment"># Restart Command Prompt and retry</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ Port 3000 or 8000 is already in use</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">Another process (a previous failed start, another Node app) is blocking that port. Find and terminate it:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-comment"># Find what is using port 8000</span></div>
+            <div><span class="t-cmd">netstat -aon | findstr :8000</span></div>
+            <div><span class="t-output">TCP  0.0.0.0:8000  LISTENING  <span style="color:#ffab70;">12345</span></span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Kill the process using that PID number</span></div>
+            <div><span class="t-cmd">taskkill /f /pid <span style="color:#ffab70;">12345</span></span></div>
+            <div><span class="t-success">SUCCESS: Process terminated.</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Repeat for port 3000, then re-run start.bat</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ pip install fails or packages not found</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">pip is outdated or broken. Repair it, then re-run the installation:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-cmd">python -m ensurepip --upgrade</span></div>
+            <div><span class="t-cmd">python -m pip install --upgrade pip</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Then re-activate venv and reinstall</span></div>
+            <div><span class="t-cmd">cd backend</span></div>
+            <div><span class="t-cmd">venv\Scripts\activate</span></div>
+            <div><span class="t-cmd">pip install -r requirements.txt</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ npm install fails or node_modules is missing</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">Package lock file or cache is corrupted. Clean everything and reinstall from scratch:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-cmd">cd frontend</span></div>
+            <div><span class="t-cmd">rmdir /s /q node_modules</span></div>
+            <div><span class="t-cmd">del package-lock.json</span></div>
+            <div><span class="t-cmd">npm cache clean --force</span></div>
+            <div><span class="t-cmd">npm install</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ Cannot connect to Jira / login fails</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">Almost always a VPN issue or incorrect .env credentials. Check in this order:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-comment"># 1. Check VPN connectivity</span></div>
+            <div><span class="t-cmd">ping projects.cdk.com</span></div>
+            <div><span class="t-comment"># Must reply — if not, connect VPN first</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># 2. Check Jira status endpoint in browser</span></div>
+            <div><span class="t-output">http://localhost:8000/api/jira/status</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># 3. After fixing .env, restart backend</span></div>
+            <div><span class="t-cmd">RESTART_BACKEND.bat</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ .env changes are not taking effect</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">The backend only reads the .env file at startup. Restart it after every edit. Also verify the filename is correct:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-comment"># Confirm the file name is exactly ".env"</span></div>
+            <div><span class="t-cmd">dir backend\config</span></div>
+            <div><span class="t-output">    .env    <span style="color:#ffab70;">← must NOT show as .env.txt</span></span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Restart backend only (frontend stays running)</span></div>
+            <div><span class="t-cmd">RESTART_BACKEND.bat</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ Frontend shows blank page or "Cannot connect"</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">Next.js may still be compiling on the first load (can take up to 60 seconds), or the backend is not running:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-comment"># Step 1: Wait 60 seconds and press F5 to refresh</span></div>
+            <div><span class="t-comment"># Step 2: Open DevTools (F12) to check console errors</span></div>
+            <div><span class="t-comment"># Step 3: Verify backend is running:</span></div>
+            <div><span class="t-output">http://localhost:8000/health</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Step 4: Check the frontend log file:</span></div>
+            <div><span class="t-cmd">type logs\frontend-dev.log</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trouble-card">
+      <div class="trouble-head">❌ AI Chat returns no response or times out</div>
+      <div class="trouble-body">
+        <div class="trouble-cause">Databricks credentials in .env are missing or incorrect. Check the RAG health endpoint first:</div>
+        <div class="terminal" style="margin:0;">
+          <div class="term-bar"><div class="term-dots"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div></div></div>
+          <div class="term-body" style="font-size:11.5px;">
+            <div><span class="t-comment"># Open in browser to see exact error</span></div>
+            <div><span class="t-output">http://localhost:8000/api/rag/health</span></div>
+            <div style="margin-top:6px;"><span class="t-comment"># Verify these three .env values with Ramesh:</span></div>
+            <div><span class="t-warn">OPENAI_API_KEY</span>           <span class="t-comment">← Databricks token</span></div>
+            <div><span class="t-warn">OPENAI_API_ENDPOINT</span>      <span class="t-comment">← Databricks serving URL</span></div>
+            <div><span class="t-warn">DATABRICKS_WORKSPACE_URL</span> <span class="t-comment">← workspace base URL</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECKLIST -->
+<div class="spacer">
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#fce7f3;">📋</div>
+    <div>
+      <div class="sec-label">Pre-Call Checklist</div>
+      <div class="sec-title">Share With Your Team Before the Setup Call</div>
+      <div class="sec-sub">Ask each team member to complete these items independently before the call. This ensures the session can focus on configuration rather than software installation.</div>
+    </div>
+  </div>
+  <div class="checklist-wrap">
+    <div class="cl-group-title">Software &amp; Access — Complete Before the Call</div>
+    <div class="cl-items">
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Python 3.11+ installed — <code>python --version</code> returns a result</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Node.js 18+ installed — <code>node --version</code> returns a result</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Connected to CDK VPN or office network</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text"><code>ping projects.cdk.com</code> returns a successful reply</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">ZIP file received from Ramesh</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">ZIP extracted to <code>C:\Projects\</code> (no spaces in path)</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Ports 3000 and 8000 are not in use</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">VS Code or Notepad++ installed for editing <code>.env</code></div></div>
+    </div>
+    <div class="cl-group-title">Credentials — Obtain from Ramesh Before the Call</div>
+    <div class="cl-items">
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Shared ENCRYPTION_KEY received from Ramesh</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">LDAP service account username confirmed</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Pre-encrypted LDAP password received from Ramesh</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Databricks API token and workspace URL provided</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Databricks model name confirmed (<code>OPENAI_MODEL</code> value)</div></div>
+    </div>
+    <div class="cl-group-title">Personal Credentials — Have Ready</div>
+    <div class="cl-items">
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Your CDK email address (for Jira &amp; Confluence)</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Your Jira API token (from id.atlassian.com → Security → API tokens)</div></div>
+      <div class="cl-item"><div class="cl-box"></div><div class="cl-text">Your CDK Windows network password (for login after setup)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK REFERENCE -->
+<div>
+  <div class="sec-header">
+    <div class="sec-icon" style="background:#dbeafe;">⚡</div>
+    <div>
+      <div class="sec-label">Quick Reference</div>
+      <div class="sec-title">Bookmark This — Daily Use</div>
+      <div class="sec-sub">Everything you need for day-to-day operation of FalconX at a glance.</div>
+    </div>
+  </div>
+  <div class="quickref">
+    <div class="qr-card">
+      <div class="qr-head" style="background:#e8edff;color:var(--primary);">🚀 Start the Application</div>
+      <div class="qr-body">Double-click <strong>start.bat</strong> in the project root.<br>Or from terminal:<br><code>cd C:\Projects\Leadership_Engine_Dev-main</code><br><code>start.bat</code></div>
+    </div>
+    <div class="qr-card">
+      <div class="qr-head" style="background:#e0faf5;color:var(--success);">🔁 Restart After .env Edits</div>
+      <div class="qr-body">Only the <em>backend</em> needs restarting when credentials change — the frontend keeps running:<br><code>RESTART_BACKEND.bat</code></div>
+    </div>
+    <div class="qr-card">
+      <div class="qr-head" style="background:#f3f0ff;color:#7c3aed;">📍 Application URLs</div>
+      <div class="qr-body">Frontend: <code>localhost:3000</code><br>Backend API: <code>localhost:8000</code><br>Swagger Docs: <code>localhost:8000/docs</code><br>Health: <code>localhost:8000/health</code></div>
+    </div>
+    <div class="qr-card">
+      <div class="qr-head" style="background:#fff1eb;color:var(--warn);">📂 Key File Locations</div>
+      <div class="qr-body">Credentials: <code>backend\config\.env</code><br>Backend log: <code>logs\backend-dev.log</code><br>Frontend log: <code>logs\frontend-dev.log</code><br>API source: <code>backend\main.py</code></div>
+    </div>
+    <div class="qr-card">
+      <div class="qr-head" style="background:#e0faf5;color:var(--success);">🔐 How to Log In</div>
+      <div class="qr-body">Use your <strong>CDK Windows network credentials</strong> — the same username and password you use to sign in to your work laptop. Authenticated via LDAP/Active Directory.</div>
+    </div>
+    <div class="qr-card">
+      <div class="qr-head" style="background:#fee2e2;color:var(--warn);">📞 Need Help?</div>
+      <div class="qr-body">Check <code>logs/</code> folder for detailed errors.<br>See Troubleshooting section (Step 6).<br><strong>Ramesh:</strong> <a href="mailto:ajith.ramesh@cdk.com" style="color:var(--primary);">ajith.ramesh@cdk.com</a></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<footer>
+  <div><strong>FalconX Leadership Engine</strong> &nbsp;·&nbsp; CDK Global &nbsp;·&nbsp; Internal Use Only &nbsp;·&nbsp; March 2026</div>
+  <div>Setup support: <a href="mailto:ajith.ramesh@cdk.com">ajith.ramesh@cdk.com</a></div>
+</footer>
+
+</body>
+</html>

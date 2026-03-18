@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FalconX Leadership Engine — Team Setup Guide</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-light: #dbeafe;
+      --green: #16a34a;
+      --green-light: #dcfce7;
+      --orange: #ea580c;
+      --orange-light: #ffedd5;
+      --red: #dc2626;
+      --red-light: #fee2e2;
+      --purple: #7c3aed;
+      --purple-light: #ede9fe;
+      --gray: #374151;
+      --gray-light: #f9fafb;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f1f5f9;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+      color: white;
+      padding: 48px 40px 36px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute; top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+    header::after {
+      content: '';
+      position: absolute; bottom: -80px; left: -40px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+    }
+    header .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 4px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    header h1 { font-size: 36px; font-weight: 800; letter-spacing: -0.5px; }
+    header p { font-size: 16px; opacity: 0.85; margin-top: 8px; }
+    header .meta {
+      display: flex; justify-content: center; gap: 32px;
+      margin-top: 24px; flex-wrap: wrap;
+    }
+    header .meta-item {
+      background: rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 13px;
+    }
+    header .meta-item strong { display: block; font-size: 18px; }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title .icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    /* ── CALL AGENDA ── */
+    .agenda-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin-bottom: 40px;
+    }
+    .agenda-item {
+      padding: 18px 12px;
+      text-align: center;
+      border-right: 1px solid rgba(255,255,255,0.2);
+      position: relative;
+    }
+    .agenda-item:last-child { border-right: none; }
+    .agenda-item .time {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.85;
+      margin-bottom: 6px;
+    }
+    .agenda-item .topic { font-size: 13px; font-weight: 600; }
+    .agenda-item .mins {
+      font-size: 11px;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+    .a1 { background: #1e3a8a; color: white; }
+    .a2 { background: #1d4ed8; color: white; }
+    .a3 { background: #2563eb; color: white; }
+    .a4 { background: #3b82f6; color: white; }
+    .a5 { background: #60a5fa; color: #1e3a8a; }
+    .a6 { background: #93c5fd; color: #1e3a8a; }
+
+    /* ── ARCH DIAGRAM ── */
+    .arch {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      border: 1px solid var(--border);
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    .arch-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+    .arch-box {
+      border-radius: 10px;
+      padding: 14px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 2px solid transparent;
+      min-width: 140px;
+    }
+    .arch-box.frontend { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
+    .arch-box.backend  { background: var(--green-light); border-color: var(--green); color: var(--green); }
+    .arch-box.ai       { background: var(--purple-light); border-color: var(--purple); color: var(--purple); }
+    .arch-box.ext      { background: var(--orange-light); border-color: var(--orange); color: var(--orange); }
+    .arch-box.auth     { background: var(--red-light); border-color: var(--red); color: var(--red); }
+    .arch-arrow { font-size: 22px; color: var(--muted); }
+    .arch-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted); margin: 6px 0 2px;
+    }
+    .arch-connector {
+      width: 2px; height: 28px; background: var(--border);
+      margin: 0 auto;
+    }
+
+    /* ── PREREQUISITES ── */
+    .prereq-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .prereq-card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .prereq-icon {
+      width: 44px; height: 44px; min-width: 44px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .prereq-card h3 { font-size: 14px; font-weight: 700; }
+    .prereq-card .version {
+      font-size: 12px; color: var(--green); font-weight: 600;
+      background: var(--green-light); border-radius: 4px;
+      padding: 1px 6px; display: inline-block; margin: 4px 0;
+    }
+    .prereq-card .cmd {
+      font-size: 11px; color: var(--muted);
+      font-family: 'Courier New', monospace;
+      background: var(--gray-light); border-radius: 4px;
+      padding: 2px 6px; display: inline-block; margin-top: 4px;
+    }
+
+    /* ── STEPS ── */
+    .steps { margin-bottom: 40px; }
+    .step {
+      display: flex; gap: 20px;
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .step-num {
+      width: 48px; height: 48px; min-width: 48px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800;
+      color: white;
+    }
+    .step-body { flex: 1; }
+    .step-title {
+      font-size: 16px; font-weight: 700;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
+    }
+    .step-time {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px;
+      background: var(--gray-light); color: var(--muted);
+    }
+    .step p { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+    pre, .code-block {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 18px;
+      font-size: 13px;
+      font-family: 'Courier New', Consolas, monospace;
+      overflow-x: auto;
+      margin: 10px 0;
+      line-height: 1.7;
+    }
+    .code-block .comment { color: #64748b; }
+    .code-block .cmd { color: #7dd3fc; }
+    .code-block .flag { color: #fbbf24; }
+    .code-block .path { color: #86efac; }
+    .code-block .val { color: #f9a8d4; }
+    .step-tip {
+      background: #fffbeb;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #92400e;
+      margin-top: 10px;
+    }
+    .step-warn {
+      background: var(--red-light);
+      border-left: 3px solid var(--red);
+      border-radius: 0 8px 8px 0;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #7f1d1d;
+      margin-top: 10px;
+    }
+    .step-ok {
+      background: var(--green-light);
+      border-left: 3px solid var(--green);
+      border-radius: 0 8px 8px 0;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #14532d;
+      margin-top: 10px;
+    }
+    .s1 .step-num { background: #1e3a8a; }
+    .s2 .step-num { background: #7c3aed; }
+    .s3 .step-num { background: #b45309; }
+    .s4 .step-num { background: #0f766e; }
+    .s5 .step-num { background: #be185d; }
+    .s6 .step-num { background: #16a34a; }
+
+    /* ── ENV TABLE ── */
+    .env-table {
+      background: white;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 40px;
+    }
+    .env-table table { width: 100%; border-collapse: collapse; }
+    .env-table th {
+      background: #1e3a8a; color: white;
+      padding: 12px 16px; font-size: 13px;
+      text-align: left;
+    }
+    .env-table td {
+      padding: 12px 16px; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .env-table tr:last-child td { border-bottom: none; }
+    .env-table tr:nth-child(even) td { background: var(--gray-light); }
+    .badge-req {
+      background: var(--red-light); color: var(--red);
+      font-size: 10px; font-weight: 700; padding: 2px 6px;
+      border-radius: 4px; text-transform: uppercase;
+    }
+    .badge-opt {
+      background: var(--green-light); color: var(--green);
+      font-size: 10px; font-weight: 700; padding: 2px 6px;
+      border-radius: 4px; text-transform: uppercase;
+    }
+    .env-table code {
+      font-family: 'Courier New', monospace; font-size: 12px;
+      background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
+    }
+
+    /* ── VERIFY GRID ── */
+    .verify-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .verify-card {
+      background: white;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 20px;
+    }
+    .verify-card h3 {
+      font-size: 14px; font-weight: 700;
+      margin-bottom: 12px; display: flex; gap: 8px; align-items: center;
+    }
+    .verify-url {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      background: #0f172a;
+      color: #7dd3fc;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .verify-expect {
+      font-size: 12px; color: var(--muted);
+    }
+    .verify-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 4px;
+    }
+    .dot-green { background: #22c55e; }
+    .dot-blue  { background: #3b82f6; }
+    .dot-purple{ background: #a855f7; }
+
+    /* ── TROUBLESHOOT ── */
+    .trouble-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .trouble-card {
+      background: white;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .trouble-header {
+      background: var(--red-light);
+      padding: 12px 16px;
+      font-size: 13px; font-weight: 700; color: var(--red);
+      display: flex; gap: 8px; align-items: center;
+    }
+    .trouble-body { padding: 14px 16px; }
+    .trouble-body .fix {
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .trouble-body pre {
+      font-size: 11px; padding: 10px 12px; margin: 0;
+    }
+
+    /* ── FLOW CHART ── */
+    .flow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      padding: 24px 0;
+      flex-wrap: nowrap;
+    }
+    .flow-step {
+      display: flex; flex-direction: column; align-items: center;
+      min-width: 100px;
+    }
+    .flow-box {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      border: 2px solid;
+      min-width: 90px;
+    }
+    .flow-arrow {
+      font-size: 20px; color: var(--muted); padding: 0 4px;
+      align-self: center;
+    }
+    .flow-label {
+      font-size: 10px; color: var(--muted); margin-top: 6px;
+      text-align: center; max-width: 90px;
+    }
+    .fb1 { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; }
+    .fb2 { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+    .fb3 { background: #fef3c7; border-color: #d97706; color: #b45309; }
+    .fb4 { background: #dcfce7; border-color: #16a34a; color: #15803d; }
+    .fb5 { background: #fce7f3; border-color: #be185d; color: #9d174d; }
+    .fb6 { background: #f0fdf4; border-color: #22c55e; color: #16a34a; }
+
+    /* ── QUICK CHECKLIST ── */
+    .checklist {
+      background: white;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-bottom: 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 8px;
+    }
+    .check-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px;
+      font-size: 13px;
+      background: var(--gray-light);
+    }
+    .check-box {
+      width: 20px; height: 20px; min-width: 20px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      background: white;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #1e3a8a; color: rgba(255,255,255,0.8);
+      text-align: center; padding: 24px;
+      font-size: 13px; margin-top: 20px;
+    }
+    footer a { color: #93c5fd; }
+
+    /* ── SECTION SPACING ── */
+    .section { margin-bottom: 48px; }
+
+    @media print {
+      body { background: white; }
+      .container { padding: 20px; }
+      header { padding: 32px 20px; }
+      .step, .verify-card, .trouble-card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ HEADER ═══════════════════════════════════════ -->
+<header>
+  <div class="badge">CDK Global · Internal Tool</div>
+  <h1>⚡ FalconX Leadership Engine</h1>
+  <p>Team Installation & Setup Guide &nbsp;·&nbsp; March 2026</p>
+  <div class="meta">
+    <div class="meta-item"><strong>~25 min</strong>Setup Time</div>
+    <div class="meta-item"><strong>Windows</strong>Primary OS</div>
+    <div class="meta-item"><strong>2 Terminals</strong>Required</div>
+    <div class="meta-item"><strong>Port 3000 + 8000</strong>Required</div>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ═══════════════════════════ 30-MIN CALL AGENDA ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#dbeafe;">📅</div>
+    30-Minute Call Agenda
+  </div>
+  <div class="agenda-grid">
+    <div class="agenda-item a1">
+      <div class="time">0:00 – 0:03</div>
+      <div class="topic">Intro & Architecture Overview</div>
+      <div class="mins">3 min</div>
+    </div>
+    <div class="agenda-item a2">
+      <div class="time">0:03 – 0:08</div>
+      <div class="topic">Prerequisites Check</div>
+      <div class="mins">5 min</div>
+    </div>
+    <div class="agenda-item a3">
+      <div class="time">0:08 – 0:18</div>
+      <div class="topic">Installation Steps 1–6</div>
+      <div class="mins">10 min</div>
+    </div>
+    <div class="agenda-item a4">
+      <div class="time">0:18 – 0:22</div>
+      <div class="topic">Env Config & Credentials</div>
+      <div class="mins">4 min</div>
+    </div>
+    <div class="agenda-item a5">
+      <div class="time">0:22 – 0:26</div>
+      <div class="topic">Verification & Health Checks</div>
+      <div class="mins">4 min</div>
+    </div>
+    <div class="agenda-item a6">
+      <div class="time">0:26 – 0:30</div>
+      <div class="topic">Q&A / Troubleshooting</div>
+      <div class="mins">4 min</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ARCHITECTURE ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#ede9fe;">🏗️</div>
+    System Architecture (What You're Installing)
+  </div>
+  <div class="arch">
+    <div class="arch-label">Your Browser</div>
+    <div class="arch-row">
+      <div class="arch-box frontend">🖥️ Next.js Frontend<br><small>localhost:3000</small></div>
+    </div>
+    <div class="arch-connector"></div>
+    <div class="arch-row">
+      <div class="arch-arrow">⬆⬇</div>
+    </div>
+    <div class="arch-connector"></div>
+    <div class="arch-label">Your Machine</div>
+    <div class="arch-row">
+      <div class="arch-box backend">⚙️ FastAPI Backend<br><small>localhost:8000</small></div>
+    </div>
+    <div class="arch-connector"></div>
+    <div class="arch-row">
+      <div class="arch-arrow">⬆⬇</div>
+    </div>
+    <div class="arch-connector"></div>
+    <div class="arch-label">CDK Network (requires VPN / on-prem)</div>
+    <div class="arch-row">
+      <div class="arch-box ext">📋 Jira<br><small>projects.cdk.com</small></div>
+      <div class="arch-box ext">📚 Confluence<br><small>confluence.cdk.com</small></div>
+      <div class="arch-box ext">🐙 GitHub<br><small>github.com</small></div>
+      <div class="arch-box ai">🤖 Databricks AI<br><small>RAG + LLM</small></div>
+      <div class="arch-box auth">🔐 LDAP/AD<br><small>CDK Directory</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ INSTALLATION FLOW ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#dcfce7;">🗺️</div>
+    Installation Flow Chart
+  </div>
+  <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:24px;overflow-x:auto;">
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-box fb1">📦<br>Get Code</div>
+        <div class="flow-label">git clone</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-box fb2">🐍<br>Python Env</div>
+        <div class="flow-label">venv + pip install</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-box fb3">📦<br>Node Deps</div>
+        <div class="flow-label">npm install</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-box fb4">⚙️<br>Configure</div>
+        <div class="flow-label">.env setup</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-box fb5">🚀<br>Start Both</div>
+        <div class="flow-label">start.bat</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="flow-box fb6">✅<br>Verify</div>
+        <div class="flow-label">health check</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted);">
+      ⚡ <strong>Windows Shortcut:</strong> Steps 2–5 are automated by <code>start.bat</code> — just run it and skip to Step 6 (Configure .env).
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ PREREQUISITES ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#fef3c7;">✅</div>
+    Step 0 — Prerequisites (Check Before the Call)
+  </div>
+  <div class="prereq-grid">
+    <div class="prereq-card">
+      <div class="prereq-icon" style="background:#dbeafe;">🐍</div>
+      <div>
+        <h3>Python 3.11+</h3>
+        <span class="version">Required</span>
+        <div class="cmd">python --version</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Download: python.org/downloads</div>
+      </div>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon" style="background:#dcfce7;">🟢</div>
+      <div>
+        <h3>Node.js 18+</h3>
+        <span class="version">Required</span>
+        <div class="cmd">node --version</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Download: nodejs.org (LTS version)</div>
+      </div>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon" style="background:#f3f4f6;">🐙</div>
+      <div>
+        <h3>Git</h3>
+        <span class="version">Required</span>
+        <div class="cmd">git --version</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Download: git-scm.com/downloads</div>
+      </div>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon" style="background:#ede9fe;">🔑</div>
+      <div>
+        <h3>CDK VPN / Network</h3>
+        <span class="version">Required for Jira/LDAP</span>
+        <div class="cmd">ping projects.cdk.com</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Must be on CDK network or VPN</div>
+      </div>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon" style="background:#ffedd5;">📋</div>
+      <div>
+        <h3>Jira API Token</h3>
+        <span class="version">Required</span>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Get from Ramesh / team lead.<br>Your CDK email + API token pair.</div>
+      </div>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon" style="background:#fce7f3;">🤖</div>
+      <div>
+        <h3>Databricks Token</h3>
+        <span class="version">Required for AI</span>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Get from Databricks admin.<br>Used for RAG + LLM features.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ INSTALLATION STEPS ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#dbeafe;">🔧</div>
+    Installation Steps
+  </div>
+  <div class="steps">
+
+    <!-- STEP 1 -->
+    <div class="step s1">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">
+          Get the Code
+          <span class="step-time">~1 min</span>
+        </div>
+        <p>Clone the repository and navigate into the project folder.</p>
+        <div class="code-block">
+<span class="comment"># Clone the repository (get the URL from Ramesh)</span>
+<span class="cmd">git clone</span> <span class="path">&lt;repository-url&gt;</span>
+
+<span class="comment"># Navigate into the project</span>
+<span class="cmd">cd</span> <span class="path">Leadership_Engine_Dev-main</span>
+        </div>
+        <div class="step-tip">💡 If you already have the ZIP file, extract it and skip the git clone step. Just open the extracted folder.</div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step s2">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">
+          Windows Quick Start (Recommended)
+          <span class="step-time">~8 min</span>
+        </div>
+        <p>The included script handles everything automatically — virtual env, backend deps, frontend deps, and starts both servers.</p>
+        <div class="code-block">
+<span class="comment"># From the project root, double-click OR run in terminal:</span>
+<span class="cmd">start.bat</span>
+
+<span class="comment"># What it does automatically:</span>
+<span class="comment">#  ✓ Creates Python virtual environment (backend/venv)</span>
+<span class="comment">#  ✓ pip install -r requirements.txt</span>
+<span class="comment">#  ✓ npm install (frontend)</span>
+<span class="comment">#  ✓ Starts frontend on http://localhost:3000</span>
+<span class="comment">#  ✓ Starts backend on http://localhost:8000</span>
+        </div>
+        <div class="step-ok">✅ Let this run fully. You'll see "Backend starting at http://localhost:8000" when it's ready.</div>
+        <div class="step-warn">⚠️ Do NOT close the terminal window — it keeps both servers running.</div>
+      </div>
+    </div>
+
+    <!-- STEP 2B -->
+    <div class="step s2">
+      <div class="step-num">2<br><small style="font-size:10px">alt</small></div>
+      <div class="step-body">
+        <div class="step-title">
+          Manual Setup (Linux / Mac / Fallback)
+          <span class="step-time">~10 min</span>
+        </div>
+        <p>Use two separate terminals. Run these in order:</p>
+        <div class="code-block">
+<span class="comment">──── Terminal 1: Backend ────────────────────────────</span>
+<span class="cmd">cd</span> <span class="path">backend</span>
+<span class="cmd">python -m venv venv</span>
+<span class="comment"># Windows:</span>
+<span class="cmd">venv\Scripts\activate</span>
+<span class="comment"># Mac/Linux:</span>
+<span class="cmd">source venv/bin/activate</span>
+
+<span class="cmd">pip install -r requirements.txt</span>
+<span class="cmd">python run_server.py</span>
+        </div>
+        <div class="code-block">
+<span class="comment">──── Terminal 2: Frontend ────────────────────────────</span>
+<span class="cmd">cd</span> <span class="path">frontend</span>
+<span class="cmd">npm install</span>
+<span class="cmd">npm run dev</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step s3">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">
+          Configure Environment Variables
+          <span class="step-time">~5 min</span>
+        </div>
+        <p>The backend needs a <code>.env</code> file with credentials. Create it in <code>backend/config/</code></p>
+        <div class="code-block">
+<span class="comment"># Navigate to config directory</span>
+<span class="cmd">cd</span> <span class="path">backend\config</span>
+
+<span class="comment"># Windows — copy the template:</span>
+<span class="cmd">copy</span> <span class="path">env.template</span> <span class="path">.env</span>
+
+<span class="comment"># Then open .env in Notepad / VS Code and fill in the values below</span>
+        </div>
+        <div class="step-warn">⚠️ NEVER commit the .env file to Git. It contains sensitive credentials.</div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step s4">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">
+          Encrypt Your Passwords
+          <span class="step-time">~2 min</span>
+        </div>
+        <p>Jira, Confluence, and LDAP passwords must be encrypted before putting them in <code>.env</code>. Run the encryption script:</p>
+        <div class="code-block">
+<span class="comment"># From backend directory, with venv activated:</span>
+<span class="cmd">cd</span> <span class="path">backend</span>
+<span class="cmd">venv\Scripts\activate</span>
+<span class="cmd">python</span> <span class="path">scripts/generate_env.py</span>
+
+<span class="comment"># Enter your plain-text password when prompted</span>
+<span class="comment"># Copy the encrypted output → paste into .env</span>
+        </div>
+        <div class="step-tip">💡 Ask Ramesh for the shared <strong>ENCRYPTION_KEY</strong> — all team members must use the same key so the backend can decrypt credentials.</div>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step s5">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">
+          (Optional) Frontend Environment
+          <span class="step-time">~1 min</span>
+        </div>
+        <p>Only needed if your backend is on a different machine or port.</p>
+        <div class="code-block">
+<span class="comment"># Create frontend/.env.local</span>
+<span class="comment"># Only set this if backend is NOT on localhost:8000</span>
+<span class="val">NEXT_PUBLIC_API_URL</span>=<span class="path">http://localhost:8000</span>
+        </div>
+        <div class="step-ok">✅ If you're running both locally, you can skip this — the default is already localhost:8000.</div>
+      </div>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="step s6">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">
+          Start / Restart After Config
+          <span class="step-time">~1 min</span>
+        </div>
+        <p>After setting up <code>.env</code>, restart the backend so it picks up the new credentials.</p>
+        <div class="code-block">
+<span class="comment"># Option A — Windows, restart backend only:</span>
+<span class="cmd">RESTART_BACKEND.bat</span>
+
+<span class="comment"># Option B — Kill everything and start fresh:</span>
+<span class="comment"># Close the start.bat terminal, then re-run:</span>
+<span class="cmd">start.bat</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ENV CONFIG TABLE ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#ffedd5;">⚙️</div>
+    Environment Variables Reference (backend/config/.env)
+  </div>
+  <div class="env-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Example Value</th>
+          <th>Required?</th>
+          <th>Where to Get It</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>SESSION_SECRET_KEY</code></td>
+          <td><code>any-32+-char-random-string</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Generate any random string (min 32 chars)</td>
+        </tr>
+        <tr>
+          <td><code>JIRA_BASE_URL</code></td>
+          <td><code>https://projects.cdk.com</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>CDK Jira URL (already set for CDK)</td>
+        </tr>
+        <tr>
+          <td><code>JIRA_SERVICE_EMAIL</code></td>
+          <td><code>yourname@cdk.com</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Your CDK email address</td>
+        </tr>
+        <tr>
+          <td><code>JIRA_SERVICE_API_TOKEN</code></td>
+          <td><code>encrypted:xxx...</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Encrypt your Jira API token using generate_env.py</td>
+        </tr>
+        <tr>
+          <td><code>CONFLUENCE_BASE_URL</code></td>
+          <td><code>https://confluence.cdk.com</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>CDK Confluence URL (already set for CDK)</td>
+        </tr>
+        <tr>
+          <td><code>CONFLUENCE_SERVICE_EMAIL</code></td>
+          <td><code>yourname@cdk.com</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Your CDK email (same as Jira)</td>
+        </tr>
+        <tr>
+          <td><code>CONFLUENCE_SERVICE_API_TOKEN</code></td>
+          <td><code>encrypted:xxx...</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Same API token as Jira (Atlassian unified)</td>
+        </tr>
+        <tr>
+          <td><code>LDAP_SERVER_URL</code></td>
+          <td><code>ldaps://ORDPGBLADC01.global.cdk.com:636</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Ask IT / already set for CDK</td>
+        </tr>
+        <tr>
+          <td><code>LDAP_SERVICE_ACCOUNT_USERNAME</code></td>
+          <td><code>global\SVC_FalconX</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Service account — get from Ramesh</td>
+        </tr>
+        <tr>
+          <td><code>LDAP_SERVICE_ACCOUNT_PASSWORD</code></td>
+          <td><code>encrypted:xxx...</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Get encrypted value from Ramesh</td>
+        </tr>
+        <tr>
+          <td><code>OPENAI_API_KEY</code></td>
+          <td><code>dapi...</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Databricks personal access token</td>
+        </tr>
+        <tr>
+          <td><code>OPENAI_API_ENDPOINT</code></td>
+          <td><code>https://dbc-xxx.cloud.databricks.com/...</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Get from Databricks admin / Ramesh</td>
+        </tr>
+        <tr>
+          <td><code>OPENAI_MODEL</code></td>
+          <td><code>databricks-gpt-5-1</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Ask Ramesh for current model name</td>
+        </tr>
+        <tr>
+          <td><code>DATABRICKS_WORKSPACE_URL</code></td>
+          <td><code>https://dbc-xxx.cloud.databricks.com</code></td>
+          <td><span class="badge-req">Required</span></td>
+          <td>Databricks workspace URL — from admin</td>
+        </tr>
+        <tr>
+          <td><code>GITHUB_TOKEN</code></td>
+          <td><code>ghp_xxx...</code></td>
+          <td><span class="badge-opt">Optional</span></td>
+          <td>GitHub PAT — only for GitHub features</td>
+        </tr>
+        <tr>
+          <td><code>GITHUB_EMAIL</code></td>
+          <td><code>yourname@cdk.com</code></td>
+          <td><span class="badge-opt">Optional</span></td>
+          <td>Your GitHub email — only for GitHub features</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ VERIFY ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#dcfce7;">🔍</div>
+    Verification — Is It Working?
+  </div>
+  <div class="verify-grid">
+    <div class="verify-card">
+      <h3><span class="verify-dot dot-green"></span>Backend Health</h3>
+      <div class="verify-url">http://localhost:8000/health</div>
+      <div class="verify-expect">✅ Expected response:<br>
+        <code style="font-size:11px;">{"status":"healthy","timestamp":"..."}</code>
+      </div>
+    </div>
+    <div class="verify-card">
+      <h3><span class="verify-dot dot-blue"></span>Frontend Login Page</h3>
+      <div class="verify-url">http://localhost:3000</div>
+      <div class="verify-expect">✅ Should show the FalconX login screen.<br>Log in with your CDK network credentials (LDAP).</div>
+    </div>
+    <div class="verify-card">
+      <h3><span class="verify-dot dot-purple"></span>API Documentation</h3>
+      <div class="verify-url">http://localhost:8000/docs</div>
+      <div class="verify-expect">✅ Swagger UI with 60+ endpoints.<br>Useful for debugging individual API calls.</div>
+    </div>
+    <div class="verify-card">
+      <h3><span class="verify-dot dot-green"></span>Jira Connection</h3>
+      <div class="verify-url">http://localhost:8000/api/jira/status</div>
+      <div class="verify-expect">✅ Should return Jira connection status.<br>If ❌, check JIRA_SERVICE_EMAIL and token in .env.</div>
+    </div>
+    <div class="verify-card">
+      <h3><span class="verify-dot dot-blue"></span>RAG Health</h3>
+      <div class="verify-url">http://localhost:8000/api/rag/health</div>
+      <div class="verify-expect">✅ Should show Databricks Vector Search status.<br>If ❌, check DATABRICKS_WORKSPACE_URL and token.</div>
+    </div>
+    <div class="verify-card">
+      <h3><span class="verify-dot dot-purple"></span>AI Chat Test</h3>
+      <div class="verify-url">http://localhost:3000 → Chat tab</div>
+      <div class="verify-expect">✅ Type "show me open bugs in current sprint".<br>Should return Jira results in natural language.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ PRE-CALL CHECKLIST ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#fce7f3;">📋</div>
+    Pre-Call Checklist (Share This With Team Before the Call)
+  </div>
+  <div class="checklist">
+    <div class="check-item"><div class="check-box"></div> Python 3.11+ installed (<code>python --version</code>)</div>
+    <div class="check-item"><div class="check-box"></div> Node.js 18+ installed (<code>node --version</code>)</div>
+    <div class="check-item"><div class="check-box"></div> Git installed (<code>git --version</code>)</div>
+    <div class="check-item"><div class="check-box"></div> Connected to CDK VPN / office network</div>
+    <div class="check-item"><div class="check-box"></div> Received the repository URL from Ramesh</div>
+    <div class="check-item"><div class="check-box"></div> Received the .env credential values from Ramesh</div>
+    <div class="check-item"><div class="check-box"></div> Ports 3000 and 8000 are free (no other services)</div>
+    <div class="check-item"><div class="check-box"></div> Have VS Code or Notepad++ to edit .env files</div>
+    <div class="check-item"><div class="check-box"></div> Have 2 terminal windows ready</div>
+    <div class="check-item"><div class="check-box"></div> Pip is up to date (<code>pip install --upgrade pip</code>)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ TROUBLESHOOTING ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#fee2e2;">🔧</div>
+    Common Issues & Quick Fixes
+  </div>
+  <div class="trouble-grid">
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ Python not found / wrong version</div>
+      <div class="trouble-body">
+        <div class="fix">Python 3.11+ is required. Try <code>py -3 --version</code> or <code>python3 --version</code>.</div>
+        <pre>pip install --upgrade pip
+python -m pip install -r requirements.txt</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ Port 8000 or 3000 already in use</div>
+      <div class="trouble-body">
+        <div class="fix">Kill the process using the port, or <code>start.bat</code> does this automatically.</div>
+        <pre># Find and kill process on port 8000 (Windows)
+netstat -aon | findstr :8000
+taskkill /f /pid &lt;PID&gt;</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ Module not found (Python)</div>
+      <div class="trouble-body">
+        <div class="fix">Virtual environment not activated, or install failed. Run:</div>
+        <pre>cd backend
+venv\Scripts\activate
+pip install -r requirements.txt</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ npm install fails / node_modules error</div>
+      <div class="trouble-body">
+        <div class="fix">Clear the cache and reinstall from scratch:</div>
+        <pre>cd frontend
+rmdir /s /q node_modules
+del package-lock.json
+npm install</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ Cannot connect to Jira / LDAP</div>
+      <div class="trouble-body">
+        <div class="fix">Almost always a VPN or credential issue. Check:</div>
+        <pre># 1. Are you on CDK VPN?
+ping projects.cdk.com
+
+# 2. Is your .env correct?
+# Check JIRA_SERVICE_EMAIL and TOKEN
+# Re-run generate_env.py if unsure</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ .env file not loading</div>
+      <div class="trouble-body">
+        <div class="fix">File must be exactly named <code>.env</code> (not <code>.env.txt</code>) and placed in <code>backend/config/</code>.</div>
+        <pre># Verify file exists:
+dir backend\config\.env
+
+# Restart backend after any .env change!
+RESTART_BACKEND.bat</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ AI chat not responding</div>
+      <div class="trouble-body">
+        <div class="fix">Check Databricks config. Hit the RAG health endpoint first:</div>
+        <pre># Open in browser:
+http://localhost:8000/api/rag/health
+
+# Check OPENAI_API_KEY and
+# DATABRICKS_WORKSPACE_URL in .env</pre>
+      </div>
+    </div>
+
+    <div class="trouble-card">
+      <div class="trouble-header">❌ Frontend shows blank page</div>
+      <div class="trouble-body">
+        <div class="fix">Next.js may still be building. Wait 30s, then check browser console (F12):</div>
+        <pre># Check frontend build log:
+logs\frontend-dev.log
+
+# Or restart frontend:
+cd frontend
+npm run dev</pre>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════ QUICK REFERENCE ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="icon" style="background:#dbeafe;">⚡</div>
+    Quick Reference Card (Bookmark This!)
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+    <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:20px;">
+      <div style="font-weight:700;margin-bottom:12px;">🚀 Start Everything</div>
+      <pre style="font-size:12px;">start.bat</pre>
+    </div>
+    <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:20px;">
+      <div style="font-weight:700;margin-bottom:12px;">🔁 Restart Backend Only</div>
+      <pre style="font-size:12px;">RESTART_BACKEND.bat</pre>
+    </div>
+    <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:20px;">
+      <div style="font-weight:700;margin-bottom:12px;">📍 URLs</div>
+      <div style="font-size:13px;line-height:2;">
+        Frontend: <code>localhost:3000</code><br>
+        Backend: <code>localhost:8000</code><br>
+        API Docs: <code>localhost:8000/docs</code><br>
+        Health: <code>localhost:8000/health</code>
+      </div>
+    </div>
+    <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:20px;">
+      <div style="font-weight:700;margin-bottom:12px;">📂 Key File Locations</div>
+      <div style="font-size:12px;line-height:2;font-family:monospace;">
+        .env → backend/config/.env<br>
+        Backend logs → logs/backend-dev.log<br>
+        Frontend logs → logs/frontend-dev.log<br>
+        API code → backend/main.py
+      </div>
+    </div>
+    <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:20px;">
+      <div style="font-weight:700;margin-bottom:12px;">🔐 Login</div>
+      <div style="font-size:13px;line-height:1.8;">
+        Use your <strong>CDK network credentials</strong>.<br>
+        Same username/password you use to log into your laptop.<br>
+        Authenticated via LDAP/Active Directory.
+      </div>
+    </div>
+    <div style="background:white;border-radius:14px;border:1px solid var(--border);padding:20px;">
+      <div style="font-weight:700;margin-bottom:12px;">📞 Need Help?</div>
+      <div style="font-size:13px;line-height:1.8;">
+        Check logs in <code>logs/</code> folder.<br>
+        See Troubleshooting section above.<br>
+        Contact: Ramesh (ajith.ramesh@cdk.com)
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<footer>
+  <strong>FalconX Leadership Engine</strong> · CDK Global · Internal Use Only<br>
+  Generated March 2026 · For setup support contact Ramesh (ajith.ramesh@cdk.com)
+</footer>
+
+</body>
+</html>
