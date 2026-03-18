@@ -2,6 +2,8 @@
 Demonstrate how Confluence queries work with indexed IS space documents
 Shows example questions and how the system responds
 """
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import os
 from dotenv import load_dotenv

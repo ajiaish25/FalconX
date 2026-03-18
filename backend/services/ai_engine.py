@@ -19,6 +19,7 @@ import html
 # RAG handlers for Confluence and Jira
 from services.rag_handler import get_handler as get_confluence_rag_handler
 from services.jira_rag_handler import get_jira_rag_handler
+from services.unified_rag_handler import get_unified_rag_handler, SourceType
 
 # Load environment variables
 load_dotenv(os.path.join(os.path.dirname(__file__), 'config.env'), override=True)
@@ -87,6 +88,54 @@ def create_databricks_async_openai_client(api_key: str, endpoint_url: str):
         # Standard OpenAI endpoint
         return AsyncOpenAI(api_key=api_key, base_url=endpoint_url)
 
+def _format_chunks_as_response(docs: list, user_query: str) -> str:
+    """
+    Format raw indexed chunks into a clean, readable response when the LLM
+    is unavailable. Produces the same bold/bullet style as the LLM prompts.
+    """
+    if not docs:
+        return f"No Confluence content found for: **{user_query}**"
+
+    lines = []
+    seen_pages: set = set()
+
+    for doc in docs:
+        m          = doc.metadata or {}
+        chunk_type = m.get("chunk_type", "text")
+        breadcrumb = m.get("breadcrumb", "")
+        page_title = m.get("title", "Untitled")
+        url        = m.get("url", "")
+
+        # Table rows: format as key-value pairs
+        if chunk_type == "table_row":
+            table_name = m.get("table_name", page_title)
+            lines.append(f"**{table_name}**")
+            for pair in doc.text.strip().split(" | "):
+                if ":" in pair:
+                    k, _, v = pair.partition(":")
+                    lines.append(f"- **{k.strip()}:** {v.strip()}")
+                else:
+                    lines.append(f"- {pair.strip()}")
+            lines.append("")
+        else:
+            # Section / text chunk
+            heading = m.get("section_heading", "")
+            if heading:
+                lines.append(f"## {heading}")
+            lines.append(doc.text.strip()[:800])
+            lines.append("")
+
+        # Collect source citation
+        if page_title not in seen_pages:
+            seen_pages.add(page_title)
+            if url:
+                lines.append(f"📄 Source: [{page_title}]({url}) ({breadcrumb})")
+            elif breadcrumb:
+                lines.append(f"📄 Source: {page_title} ({breadcrumb})")
+
+    return "\n".join(lines).strip()
+
+
 class IntelligentAIEngine:
     """
     Advanced AI engine that uses OpenAI to:
@@ -100,9 +149,11 @@ class IntelligentAIEngine:
     
     # Project-specific Confluence space mappings
     PROJECT_CONFLUENCE_SPACES = {
-        'NDP': 'IS',  # Intelligence Suite
+        'NDP': 'IS',       # Intelligence Suite
         'SSBYOD': 'IS',
-        'default': 'IS'  # Default space for queries
+        'DMS': 'EMT',      # DMS Modern Enablement → Engineering Modernization Team
+        'EMT': 'EMT',      # Direct EMT space reference
+        'default': 'IS'    # Default space for queries
     }
     
     # Project-specific Jira field mappings
@@ -1808,7 +1859,9 @@ Your response:"""
                     "source": "confluence_not_configured"
                 }
             confluence_result = await self._process_confluence_query(user_query)
-            if confluence_result.get('data'):
+            # Check success flag OR non-empty response — NOT just data list,
+            # because index-first answers may have data=[] with a valid LLM response.
+            if confluence_result.get('success') or confluence_result.get('response'):
                 return confluence_result
             else:
                 return {
@@ -1888,7 +1941,7 @@ Your response:"""
                 }
             
             confluence_result = await self._process_confluence_query(user_query)
-            if confluence_result.get('data'):
+            if confluence_result.get('success') or confluence_result.get('response'):
                 return confluence_result
             else:
                 return {
@@ -1897,7 +1950,7 @@ Your response:"""
                     "success": False,
                     "source": "confluence"
                 }
-        
+
         # If source is "auto" or unspecified, use AI-based intelligent classification
         if not self.client:
             return await self._fallback_processing(user_query)
@@ -5733,7 +5786,13 @@ You can browse all team members, view their profiles, and find contact informati
                 'operations': 'OPS',
                 'engineering': 'ENG',
                 'production': 'PROD',
-                'testing': 'TEST'
+                'testing': 'TEST',
+                'engineering modernization': 'EMT',
+                'engineering efficiency transformation': 'EMT',
+                'dms modern enablement': 'EMT',
+                'dms enablement': 'EMT',
+                'automation dms': 'EMT',
+                'modern enablement': 'EMT'
             }
             
             # Check for multi-word names first (more specific), sorted by length descending
@@ -5759,7 +5818,7 @@ You can browse all team members, view their profiles, and find contact informati
                     r'browse\s+([A-Z0-9]{2,4})\b'  # Only short codes
                 ]
                 
-                known_spaces = ['IS', 'IT', 'DEV', 'QA', 'PM', 'HR', 'FIN', 'OPS', 'ENG', 'PROD', 'TEST']
+                known_spaces = ['IS', 'IT', 'DEV', 'QA', 'PM', 'HR', 'FIN', 'OPS', 'ENG', 'PROD', 'TEST', 'EMT', 'DMS']
                 for pattern in display_patterns:
                     match = re.search(pattern, user_query, re.IGNORECASE)
                     if match:
@@ -5772,7 +5831,7 @@ You can browse all team members, view their profiles, and find contact informati
             
             # Also check for common space names mentioned (standalone or in context)
             if not space_key:
-                common_spaces = ['IS', 'IT', 'DEV', 'QA', 'PM', 'HR', 'FIN', 'OPS', 'ENG', 'PROD', 'TEST']
+                common_spaces = ['IS', 'IT', 'DEV', 'QA', 'PM', 'HR', 'FIN', 'OPS', 'ENG', 'PROD', 'TEST', 'EMT', 'DMS']
                 for space in common_spaces:
                     # Check if space appears as a word (not part of another word)
                     space_pattern = r'\b' + re.escape(space) + r'\b'
@@ -5804,7 +5863,7 @@ You can browse all team members, view their profiles, and find contact informati
                         elif len(match.groups()) > 0:
                             potential_key = match.group(1).upper()
                             # Only accept if it's a known space key or very short (2-4 chars) to avoid false positives
-                            known_spaces = ['IS', 'IT', 'DEV', 'QA', 'PM', 'HR', 'FIN', 'OPS', 'ENG', 'PROD', 'TEST']
+                            known_spaces = ['IS', 'IT', 'DEV', 'QA', 'PM', 'HR', 'FIN', 'OPS', 'ENG', 'PROD', 'TEST', 'EMT', 'DMS']
                             if (potential_key in known_spaces) or (2 <= len(potential_key) <= 4 and potential_key.isalnum()):
                                 space_key = potential_key
                                 logger.info(f"Detected space from 'in [space]' pattern: {space_key}")
@@ -5827,27 +5886,73 @@ You can browse all team members, view their profiles, and find contact informati
                 if has_content_query or has_meaningful_search:
                     # This is a search query - search within the specified space
                     logger.info(f"Detected content search query in space {space_key}. Searching within space...")
-                    
+
                     # Extract search query (remove space-related terms)
-                    # First, try to get meaningful terms
                     if meaningful_terms:
                         search_query = ' '.join(meaningful_terms)
                     else:
-                        # Fallback: use original query but remove space-related terms
                         search_query = re.sub(r'\b(intelligent\s+suite|IS|space|project|from|details|show\s+me|get|find)\b', '', user_query, flags=re.IGNORECASE).strip()
-                    
-                    # If still empty or too short, use the main content terms from the query
+
                     if not search_query or len(search_query.strip()) < 2:
-                        # Extract the main content (e.g., "Onboarding procedure" from "show me Onboarding procedure details from Intelligent Suite Project")
-                        # Remove common query words and space names
                         search_query = re.sub(r'\b(show\s+me|get|find|give\s+me|can\s+you|please|details|from|the|intelligent\s+suite|IS|space|project)\b', '', user_query, flags=re.IGNORECASE).strip()
-                    
-                    # Clean up extra whitespace
+
                     search_query = ' '.join(search_query.split())
-                    
                     logger.info(f"Searching for '{search_query}' in space {space_key}")
-                    
-                    # Search within the specific space using full-text search
+
+                    # ---- Index-first: try vector store filtered by space ----
+                    _HIGH = 0.85; _LOW = 0.50
+                    space_results = None
+                    try:
+                        unified_rag = get_unified_rag_handler()
+                        if unified_rag and unified_rag.vector_store:
+                            idx_docs = await unified_rag.hybrid_search(
+                                query=user_query, top_k=8,
+                                source_filter=[SourceType.CONFLUENCE], min_score=_LOW
+                            )
+                            # Filter to requested space
+                            idx_docs = [d for d in idx_docs if d.metadata.get("space", "").upper() == space_key.upper()]
+                            if idx_docs:
+                                top_score = idx_docs[0].similarity_score or 0.0
+                                logger.info(f"✅ [Space index] {len(idx_docs)} chunks for space {space_key} (top={top_score:.3f})")
+                                # Build context and generate answer
+                                ctx_parts, src_pages = [], {}
+                                for doc in idx_docs:
+                                    m = doc.metadata
+                                    pid = m.get("page_id", "")
+                                    if pid and pid not in src_pages:
+                                        src_pages[pid] = {"title": m.get("title",""), "url": m.get("url",""), "breadcrumb": m.get("breadcrumb",""), "space": m.get("space",""), "space_name": m.get("space_name","")}
+                                    ct = m.get("chunk_type",""); bc = m.get("breadcrumb",""); tbl = m.get("table_name",""); sec = m.get("section_heading","")
+                                    hdr = f"[TABLE: {tbl or m.get('title','')}] ({bc})" if ct == "table_row" else (f"[SECTION: {sec}] ({bc})" if ct == "section" and sec else f"[{bc}]" if bc else f"[{m.get('title','')}]")
+                                    ctx_parts.append(f"{hdr}\n{doc.text.strip()}")
+                                chunk_context = "\n\n---\n\n".join(ctx_parts)
+                                if self.client:
+                                    conf_note = "The retrieved chunks are highly relevant." if top_score >= _HIGH else "The retrieved chunks are moderately relevant; answer based on what you found."
+                                    try:
+                                        llm_r = self.client.chat.completions.create(
+                                            model=self.model,
+                                            messages=[
+                                                {"role": "system", "content": f"You are a knowledgeable assistant. Answer the user's question DIRECTLY using ONLY the retrieved Confluence chunks below. Synthesize the answer; do NOT just list page titles. Cite the source breadcrumb at the end. {conf_note}"},
+                                                {"role": "user", "content": f"User question: {user_query}\n\nRetrieved chunks:\n\n{chunk_context[:8000]}"}
+                                            ], max_tokens=2000, temperature=0.2
+                                        )
+                                        idx_answer = llm_r.choices[0].message.content.strip()
+                                    except Exception:
+                                        idx_answer = f"**Confluence Results (space={space_key})**\n\n{chunk_context[:3000]}"
+                                else:
+                                    idx_answer = f"**Confluence Results (space={space_key})**\n\n{chunk_context[:3000]}"
+                                base_url = self.confluence_client.cfg.base_url if self.confluence_client else ""
+                                return {
+                                    "jql": f"confluence_index_space:{space_key}:{search_query}",
+                                    "response": idx_answer + f"\n\n**{space_key} Space:** {base_url}/display/{space_key}",
+                                    "data": [{"title": v["title"], "url": v["url"], "breadcrumb": v["breadcrumb"], "space": v["space"], "space_name": v["space_name"], "type": "confluence_indexed"} for v in src_pages.values()],
+                                    "intent": "confluence_search_in_space", "success": True,
+                                    "space": space_key, "index_used": True
+                                }
+                            else:
+                                logger.info(f"ℹ️ No indexed chunks for space {space_key} — falling back to live CQL")
+                    except Exception as _ie:
+                        logger.warning(f"⚠️ Index space search failed: {_ie}")
+                    # ---- Fallback: live CQL search in space ----
                     space_results = await self.confluence_client.search_in_space(search_query, space=space_key, limit=10)
                     
                     if space_results:
@@ -5956,91 +6061,295 @@ Available in this space:
             # Extract search terms from the query
             search_terms = self._extract_confluence_search_terms(user_query)
             logger.info(f"Extracted search terms: '{search_terms}'")
-            
+
+            # ----------------------------------------------------------------
+            # COLD-START / BLOCKER CHECK
+            # If the index is actively being built, tell the user honestly and
+            # still attempt a CQL fallback so they get something useful.
+            # ----------------------------------------------------------------
+            try:
+                from services.indexing_scheduler import get_indexing_scheduler
+                _sched = get_indexing_scheduler()
+                _idx_status = _sched.get_status() if _sched else {}
+                _is_indexing = _idx_status.get("is_indexing", False)
+                _doc_count   = _idx_status.get("doc_count", 0)
+                _progress    = _idx_status.get("progress_pct", 0)
+                _phase       = _idx_status.get("phase", "idle")
+            except Exception:
+                _is_indexing = False
+                _doc_count   = 0
+                _progress    = 0
+                _phase       = "idle"
+
+            _indexing_notice = ""
+            if _is_indexing:
+                phase_label = {
+                    "warmup":                  "building the initial index",
+                    "full_confluence":         "running a full Confluence re-index",
+                    "incremental_confluence":  "syncing recent Confluence changes",
+                    "incremental_jira":        "syncing recent Jira updates",
+                }.get(_phase, "indexing")
+                _indexing_notice = (
+                    f"\n\n> **Note:** The Confluence index is currently {phase_label} "
+                    f"({_progress}% complete). Results shown below are from a live search "
+                    f"and may be less precise — full AI-powered answers will be available "
+                    f"once indexing completes."
+                )
+                logger.info(f"[ColdStart] Index is {phase_label} ({_progress}%) — live CQL will be used as fallback")
+
+            # ----------------------------------------------------------------
+            # INDEX-FIRST VECTOR SEARCH
+            # Search the local SQLite/in-memory vector store (populated by the
+            # indexing scheduler) before hitting the live Confluence API.
+            # Confidence bands:
+            #   ≥ 0.85  → high confidence, answer directly from chunks
+            #   0.65–0.85 → moderate, answer with attribution note
+            #   0.50–0.65 → possibly related, answer with caveat
+            #   < 0.50  → fall through to live CQL search
+            # ----------------------------------------------------------------
+            HIGH_CONF   = 0.85
+            MOD_CONF    = 0.65
+            LOW_CONF    = 0.50
+
+            try:
+                unified_rag = get_unified_rag_handler()
+                if unified_rag and unified_rag.vector_store:
+                    logger.info("🔍 INDEX-FIRST: Searching local vector index for Confluence chunks...")
+                    indexed_docs = await unified_rag.hybrid_search(
+                        query=user_query,
+                        top_k=8,
+                        source_filter=[SourceType.CONFLUENCE],
+                        min_score=LOW_CONF
+                    )
+
+                    if indexed_docs:
+                        top_score = indexed_docs[0].similarity_score or 0.0
+                        logger.info(
+                            f"✅ Found {len(indexed_docs)} indexed chunks (top score={top_score:.3f})"
+                        )
+
+                        # Build context for LLM from chunk metadata + text
+                        chunk_context_parts = []
+                        source_pages = {}   # page_id → {title, url, breadcrumb}
+
+                        for doc in indexed_docs:
+                            m = doc.metadata
+                            page_id    = m.get("page_id", "")
+                            page_title = m.get("title", "Untitled")
+                            breadcrumb = m.get("breadcrumb", "")
+                            url        = m.get("url", "")
+                            chunk_type = m.get("chunk_type", "text")
+                            section    = m.get("section_heading", "")
+                            table_name = m.get("table_name", "")
+                            score      = doc.similarity_score or 0.0
+
+                            # Collect unique source pages for citation list
+                            if page_id and page_id not in source_pages:
+                                source_pages[page_id] = {
+                                    "title":      page_title,
+                                    "url":        url,
+                                    "breadcrumb": breadcrumb,
+                                    "space":      m.get("space", ""),
+                                    "space_name": m.get("space_name", ""),
+                                }
+
+                            # Build readable chunk header
+                            if chunk_type == "table_row":
+                                header = f"[TABLE: {table_name or page_title}] ({breadcrumb})"
+                            elif chunk_type == "section" and section:
+                                header = f"[SECTION: {section}] ({breadcrumb})"
+                            else:
+                                header = f"[{breadcrumb}]" if breadcrumb else f"[{page_title}]"
+
+                            chunk_context_parts.append(
+                                f"{header}\n{doc.text.strip()}"
+                            )
+
+                        chunk_context = "\n\n---\n\n".join(chunk_context_parts)
+
+                        # Generate LLM response from indexed chunks
+                        if self.client:
+                            # Confidence note for the system prompt
+                            if top_score >= HIGH_CONF:
+                                conf_note = "The retrieved chunks are highly relevant."
+                            elif top_score >= MOD_CONF:
+                                conf_note = "The retrieved chunks are moderately relevant; answer based on what you found."
+                            else:
+                                conf_note = "The retrieved chunks may be partially relevant; answer what you can and note uncertainty."
+
+                            system_prompt = f"""You are a precise AI assistant that answers questions from Confluence documentation.
+
+ANSWER STYLE — follow this exactly:
+- Start directly with the answer. No preamble like "Based on the content..." or "I found..."
+- Use **bold** for every key value, name, URL, branch name, or important term
+- Use `## Section Title` headers only when the answer covers multiple distinct topics
+- Use bullet points ( - ) for lists of 3+ items
+- One blank line between sections
+- End with a compact source line: `📄 Source: Page Title (Space > Parent > Page)`
+- If a URL is present, include it as: `🔗 [Page Title](url)`
+- Be concise — say exactly what was asked, nothing more
+
+CONFIDENCE NOTE: {conf_note}
+
+DO NOT:
+- Say "Key Information:" as a prefix
+- Repeat the user's question back to them
+- List page titles as the answer
+- Add unnecessary caveats if the answer is clearly in the content"""
+
+                            user_prompt = (
+                                f"Question: {user_query}\n\n"
+                                f"Confluence chunks:\n\n{chunk_context[:8000]}"
+                            )
+
+                            try:
+                                llm_response = self.client.chat.completions.create(
+                                    model=self.model,
+                                    messages=[
+                                        {"role": "system", "content": system_prompt},
+                                        {"role": "user",   "content": user_prompt}
+                                    ],
+                                    max_tokens=2000,
+                                    temperature=0.2
+                                )
+                                answer = llm_response.choices[0].message.content.strip()
+                            except Exception as llm_err:
+                                logger.warning(f"LLM call failed for indexed chunks: {llm_err}")
+                                # Fallback: format chunks into readable response
+                                answer = _format_chunks_as_response(indexed_docs[:5], user_query)
+                        else:
+                            answer = _format_chunks_as_response(indexed_docs[:5], user_query)
+
+                        # Build citation data list compatible with existing front-end format
+                        citation_data = [
+                            {
+                                "title":      info["title"],
+                                "url":        info["url"],
+                                "breadcrumb": info["breadcrumb"],
+                                "space":      info["space"],
+                                "space_name": info["space_name"],
+                                "type":       "confluence_indexed"
+                            }
+                            for info in source_pages.values()
+                        ]
+
+                        return {
+                            "jql":     f"confluence_index:{search_terms}",
+                            "response": answer,
+                            "data":    citation_data,
+                            "intent":  "confluence_search",
+                            "success": True,
+                            "index_used": True,
+                            "top_score":  top_score
+                        }
+                    else:
+                        logger.info("ℹ️ No indexed chunks met threshold — falling back to live CQL search")
+                else:
+                    logger.info("ℹ️ Vector store empty or unavailable — using live CQL search")
+            except Exception as idx_err:
+                logger.warning(f"⚠️ Index search failed, falling back to live CQL: {idx_err}")
+
+            # ----------------------------------------------------------------
+            # LIVE CQL FALLBACK (used when index is empty or scores too low)
+            # ----------------------------------------------------------------
             # Detect project from query to determine which space to search
             detected_project = self._extract_project_from_query(user_query)
             target_space = self.PROJECT_CONFLUENCE_SPACES.get(detected_project or 'default', default_space)
-            logger.info(f"Target Confluence space: {target_space} (project: {detected_project or 'default'})")
-            
-            # RAG-first: use vector search + LLM if available
-            try:
-                rag_handler = get_confluence_rag_handler()
-                if rag_handler:
-                    rag_result = rag_handler.generate_rag_response(
-                        query=search_terms or user_query,
-                        num_docs=5,
-                        temperature=0.3
-                    )
-                    rag_answer = rag_result.get("answer")
-                    rag_citations = rag_result.get("citations", [])
-                    if rag_answer:
-                        logger.info(f"✅ RAG Confluence response generated with {len(rag_citations)} citations")
-                        return {
-                            "jql": f"confluence_rag:{search_terms}",
-                            "response": rag_answer,
-                            "data": rag_citations,
-                            "intent": "confluence_search",
-                            "success": True,
-                            "rag_used": True,
-                            "rag_citations": rag_citations
-                        }
-            except Exception as rag_err:
-                logger.warning(f"⚠️ Confluence RAG handler failed, falling back to API search: {rag_err}")
-            
-            # Search Confluence
-            logger.info("Searching Confluence...")
-            logger.info(f"Confluence client type: {type(self.confluence_client)}")
-            logger.info(f"Confluence client config: {self.confluence_client.cfg.base_url if self.confluence_client else 'None'}")
-            
-            # Try multiple search strategies
+            logger.info(f"[CQL Fallback] Target space: {target_space} (project: {detected_project or 'default'})")
+
             confluence_results = []
-            
-            # Strategy 1: Search in IS space first (primary space for NDP project)
-            logger.info(f"Strategy 1: Searching in {target_space} space with terms: '{search_terms}'")
+
+            # Strategy 1: Search target space
+            logger.info(f"[CQL] Strategy 1: Searching {target_space} space with: '{search_terms}'")
             confluence_results = await self.confluence_client.search_in_space(search_terms, space=target_space, limit=10)
-            logger.info(f"Strategy 1 ({target_space} space) found {len(confluence_results)} results")
-            
-            # If no results in specific space, also search globally
+            logger.info(f"[CQL] Strategy 1 found {len(confluence_results)} results")
+
+            # Strategy 2: Global search if space search failed
             if not confluence_results:
-                logger.info("Fallback: Searching all Confluence")
+                logger.info("[CQL] Strategy 2: Global search")
                 confluence_results = await self.confluence_client.search(search_terms, limit=10)
-                logger.info(f"Global search found {len(confluence_results)} results")
-            
-            # Strategy 2: If no results, try individual keywords
+                logger.info(f"[CQL] Strategy 2 found {len(confluence_results)} results")
+
+            # Strategy 3: Individual keywords
             if not confluence_results and len(search_terms.split()) > 1:
-                individual_keywords = search_terms.split()
-                logger.info(f"Strategy 2: Searching with individual keywords: {individual_keywords}")
-                for keyword in individual_keywords[:2]:  # Try top 2 keywords
-                    keyword_results = await self.confluence_client.search(keyword, limit=5)
-                    confluence_results.extend(keyword_results)
-                    logger.info(f"Keyword '{keyword}' found {len(keyword_results)} results")
-                # Remove duplicates
-                seen_ids = set()
-                confluence_results = [r for r in confluence_results if r.get('content', {}).get('id') not in seen_ids and not seen_ids.add(r.get('content', {}).get('id', ''))]
-                logger.info(f"Strategy 2 total unique results: {len(confluence_results)}")
-            
-            # Strategy 3: If still no results, try broader search
+                logger.info("[CQL] Strategy 3: Individual keyword search")
+                seen_ids: set = set()
+                for keyword in search_terms.split()[:2]:
+                    kw_results = await self.confluence_client.search(keyword, limit=5)
+                    for r in kw_results:
+                        rid = r.get('content', {}).get('id', '')
+                        if rid not in seen_ids:
+                            seen_ids.add(rid)
+                            confluence_results.append(r)
+                logger.info(f"[CQL] Strategy 3 found {len(confluence_results)} results")
+
+            # Strategy 4: Broadest single keyword
             if not confluence_results:
-                logger.info("Strategy 3: Trying broader search with 'insurance eligibility'")
-                broader_results = await self.confluence_client.search("insurance eligibility", limit=10)
-                confluence_results.extend(broader_results)
-                logger.info(f"Strategy 3 found {len(broader_results)} results")
-            
-            logger.info(f"Final Confluence results: {len(confluence_results)}")
-            logger.info(f"Confluence results: {confluence_results}")
-            
-            # Generate AI response for Confluence data
-            logger.info("Generating AI response for Confluence data...")
+                broad_term = search_terms.split()[0] if search_terms else ""
+                if broad_term:
+                    logger.info(f"[CQL] Strategy 4: Broadest keyword '{broad_term}'")
+                    confluence_results = await self.confluence_client.search(broad_term, limit=10)
+                    logger.info(f"[CQL] Strategy 4 found {len(confluence_results)} results")
+
+            # Strategy 5: Brute-force across ALL known spaces
+            # This handles queries like "Account Receivables branch" where the
+            # user didn't say which space — we try every space we know.
+            if not confluence_results:
+                known_spaces = ['IS', 'EMT', 'DMS', 'SSBYOD', 'NDP']
+                logger.info(f"[CQL] Strategy 5: Trying all known spaces: {known_spaces}")
+                for kspace in known_spaces:
+                    if kspace == target_space:
+                        continue  # already tried this one
+                    try:
+                        kresults = await self.confluence_client.search_in_space(
+                            search_terms, space=kspace, limit=5
+                        )
+                        if kresults:
+                            confluence_results.extend(kresults)
+                            logger.info(f"[CQL] Strategy 5 found {len(kresults)} in {kspace}")
+                    except Exception:
+                        pass
+                if confluence_results:
+                    logger.info(f"[CQL] Strategy 5 total: {len(confluence_results)} across spaces")
+
+            logger.info(f"[CQL] Final result count: {len(confluence_results)}")
+
+            # If CQL also returned nothing and index is being built, give a
+            # clear user-friendly message instead of a blank response.
+            if not confluence_results and _is_indexing:
+                building_msg = (
+                    "**Confluence index is being built**\n\n"
+                    f"The system is currently indexing Confluence ({_progress}% complete). "
+                    "Your question will be answerable with full AI precision once indexing finishes — "
+                    "this usually takes a few minutes.\n\n"
+                    "**What you can do right now:**\n"
+                    "- Try again in a few minutes\n"
+                    "- Ask a simpler keyword question (e.g. just the page title)\n"
+                    "- Browse Confluence directly while the index builds"
+                )
+                return {
+                    "jql":        f"confluence_indexing:{search_terms}",
+                    "response":   building_msg,
+                    "data":       [],
+                    "intent":     "confluence_indexing",
+                    "success":    False,
+                    "index_used": False,
+                    "indexing":   True,
+                    "progress":   _progress
+                }
+
             response = await self._generate_confluence_response(user_query, confluence_results)
-            logger.info(f"Generated response length: {len(response)} characters")
-            logger.info(f"Response preview: {response[:200]}...")
-            
+            # Append indexing notice if index is mid-build
+            if _indexing_notice:
+                response += _indexing_notice
+
             return {
-                "jql": f"confluence_search:{search_terms}",
+                "jql":     f"confluence_search:{search_terms}",
                 "response": response,
-                "data": confluence_results,
-                "intent": "confluence_search",
-                "success": True
+                "data":    confluence_results,
+                "intent":  "confluence_search",
+                "success": True,
+                "index_used": False
             }
             
         except Exception as e:
@@ -6057,37 +6366,73 @@ Available in this space:
             }
     
     def _extract_confluence_search_terms(self, user_query: str) -> str:
-        """Extract relevant search terms from Confluence queries"""
-        # re is already imported at module level, no need to import again
-        
-        # Remove only very common stop words, keep important terms
-        stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were']
-        
-        # Clean the query
-        query_lower = user_query.lower()
-        
-        # Remove common phrases but keep important content
-        query_lower = re.sub(r'\b(i need|i want|show me|find me|get me|give me|can you|please)\b', '', query_lower)
-        
-        # Split into words and filter
-        words = query_lower.split()
-        search_terms = []
-        
-        for word in words:
-            # Remove punctuation and clean
-            clean_word = re.sub(r'[^\w]', '', word)
-            if clean_word and clean_word not in stop_words and len(clean_word) > 1:
-                search_terms.append(clean_word)
-        
-        # If no meaningful terms found, try the original query
-        if not search_terms:
-            return user_query
-        
-        # Return meaningful terms for better search
-        return ' '.join(search_terms[:5])  # Allow more keywords for better results
+        """
+        Extract relevant search terms from Confluence queries.
+
+        Priority order:
+        1. Multi-word proper noun phrases (e.g. "GL Inquiry", "DMS Modern Enablement")
+        2. Single proper nouns (capitalized words like "Automation", "EMT")
+        3. Remaining meaningful words (generic terms like "repo", "branches")
+
+        This ensures subject-specific entity names are always included in the search,
+        even when they appear late in the query.
+        """
+        # Noise phrases to strip before processing
+        noise_phrases = r'\b(i need|i want|show me|find me|get me|give me|can you|please|tell me|what is|what are|list|fetch|retrieve|details|detail|information|info)\b'
+        cleaned = re.sub(noise_phrases, '', user_query, flags=re.IGNORECASE).strip()
+
+        stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'is', 'are', 'was', 'were', 'its', 'it', 'this',
+            'that', 'from', 'as', 'into', 'about', 'all', 'also', 'how', 'which'
+        }
+
+        # --- Priority 1: Extract multi-word proper noun phrases (2+ consecutive Title Case words)
+        # Matches things like "GL Inquiry", "DMS Modern Enablement", "AP Invoice"
+        multi_word_proper = re.findall(r'\b([A-Z][a-zA-Z0-9]*(?:\s+[A-Z][a-zA-Z0-9]*)+)\b', user_query)
+
+        # --- Priority 2: Single proper nouns and uppercase abbreviations
+        single_proper = re.findall(r'\b([A-Z]{2,}|[A-Z][a-z]{2,})\b', user_query)
+        single_proper = [w for w in single_proper if w.lower() not in stop_words]
+
+        # --- Priority 3: Remaining meaningful lowercase words
+        all_words = re.findall(r'\b\w+\b', cleaned.lower())
+        generic = [w for w in all_words if w not in stop_words and len(w) > 2
+                   and w not in {p.lower() for phrase in multi_word_proper for p in phrase.split()}
+                   and w not in {s.lower() for s in single_proper}]
+
+        # Build final search string: proper phrases first, then single proper nouns, then generic
+        parts = []
+        seen = set()
+
+        for phrase in multi_word_proper:
+            if phrase.lower() not in seen:
+                parts.append(phrase)
+                seen.add(phrase.lower())
+
+        for word in single_proper:
+            if word.lower() not in seen:
+                parts.append(word)
+                seen.add(word.lower())
+
+        # Add up to 3 generic terms to fill context
+        added_generic = 0
+        for word in generic:
+            if word not in seen and added_generic < 3:
+                parts.append(word)
+                seen.add(word)
+                added_generic += 1
+
+        result = ' '.join(parts[:6])  # Max 6 terms total
+
+        if not result.strip():
+            return user_query  # Fallback: use original query unchanged
+
+        logger.debug(f"[SearchTerms] '{user_query}' → '{result}'")
+        return result
     
     async def _generate_confluence_response(self, user_query: str, confluence_results: List[Dict]) -> str:
-        """Generate AI response for Confluence search results"""
+        """Generate AI response for Confluence search results (CQL path)"""
         if not self.client:
             return self._basic_confluence_response(confluence_results)
         
@@ -6133,11 +6478,17 @@ Available in this space:
                                 page_body = html.unescape(page_body)
                     
                     # Use full content if available, otherwise use excerpt
+                    # Apply relevance-based extraction to get the most query-relevant sections
+                    MAX_PAGE_CONTENT = 2500
                     if page_body:
-                        # Return full content (not truncated) for meaningful results
-                        content_preview = page_body
+                        # Use smart relevance extraction instead of simple truncation
+                        content_preview = self.confluence_client.extract_relevant_content(
+                            page_text=page_body,
+                            query=user_query,
+                            max_chars=MAX_PAGE_CONTENT
+                        )
                     else:
-                        excerpt = result.get('excerpt', '')[:500] + "..." if result.get('excerpt') else "No content available"
+                        excerpt = result.get('excerpt', '')[:600] + "..." if result.get('excerpt') else "No content available"
                         content_preview = excerpt
                     
                     # Generate URL in display format
@@ -6159,57 +6510,42 @@ Available in this space:
                             data_summary += f"\n   Version: {page_metadata['version']}"
                     
                     data_summary += f"\n   Full Content:\n   {content_preview}\n\n"
-            
-            system_prompt = """You are an elite AI knowledge management consultant specializing in documentation analysis and strategic information retrieval. You help leaders find and understand critical information that drives business decisions.
 
-CRITICAL RESPONSE FORMAT - ALWAYS USE THIS STRUCTURE:
+            # Enforce total data_summary size limit to prevent LLM context overflow
+            MAX_DATA_SUMMARY = 10000
+            if len(data_summary) > MAX_DATA_SUMMARY:
+                data_summary = data_summary[:MAX_DATA_SUMMARY] + "\n\n[Additional content truncated - showing most relevant results]"
 
-Format Guidelines:
-- NO asterisks, stars, or markdown symbols
-- Use clear section headers (no formatting symbols)
-- Use colons for key-value pairs
-- Use simple dashes (-) for lists with 2-space indentation
-- Keep responses concise and on-point
-- Professional tone, direct answers
+            system_prompt = """You are a precise AI assistant that answers questions from Confluence documentation.
 
-Structure:
-1. Section Header (if needed)
-2. Key information with colons
-3. Details with indentation and dashes
-4. Analysis or insights in paragraph form
+ANSWER STYLE — follow this exactly:
+- Start directly with the answer. No preamble like "Based on the content..." or "I found..."
+- Use **bold** for every key value, name, URL, branch name, or important term
+- Use `## Section Title` headers only when the answer covers multiple distinct topics
+- Use bullet points ( - ) for lists of 3+ items
+- One blank line between sections
+- End with a compact source line: `📄 Source: Page Title (Space Name)`
+- If a URL is present, include it as: `🔗 [Page Title](url)`
+- Be concise — say exactly what was asked, nothing more
 
-Response Guidelines:
-- Be helpful and informative with strategic business context
-- Provide context about why pages might be relevant
-- Suggest next steps for finding more information
-- Use professional, direct tone
-- Include specific page titles and spaces when relevant
-- Connect documentation to business outcomes
+DO NOT:
+- Say "Key Information:" as a prefix
+- Repeat the user's question back to them
+- List page titles as the answer (e.g. "I found 3 pages titled...")
+- Add unnecessary caveats when the answer is clearly present in the content
+- Use long preambles before the actual answer
 
-Example Format:
-Documentation Found
+EXAMPLE of correct output for "what is the GL Inquiry branch?":
+The internal branch for **GL Inquiry** is **me-gl-main**.
 
-Title: API Integration Guide
-Space: Intelligence Suite
-Last Updated: December 1, 2025
+📄 Source: Automation - DMS Modern Enablement (EMT Space)"""
 
-Summary:
-Comprehensive guide covering API authentication, endpoints, and integration patterns for the Intelligence Suite platform.
+            user_prompt = f"""User Question: "{user_query}"
 
-Key Sections:
-  - Authentication and Security
-  - API Endpoints Reference
-  - Error Handling
-  - Best Practices
-
-Relevance: High - Directly addresses your query about API integration."""
-
-            user_prompt = f"""User Query: "{user_query}"
-
-Confluence Search Results:
+Confluence Page Content:
 {data_summary}
 
-Please provide a helpful response about these Confluence search results."""
+Based on the Confluence content above, directly answer the user's question. Extract and present the specific information requested. If the answer is in the content, provide it clearly. If not found, say what was searched and suggest alternatives."""
 
             logger.info(f"Calling OpenAI with data_summary length: {len(data_summary)}")
             logger.info(f"Data summary preview: {data_summary[:300]}...")
@@ -6221,9 +6557,9 @@ Please provide a helpful response about these Confluence search results."""
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.3,
-                max_tokens=1200
+                max_tokens=2000
             )
-            
+
             ai_response = response.choices[0].message.content.strip()
             logger.info(f"OpenAI response length: {len(ai_response)}")
             logger.info(f"OpenAI response preview: {ai_response[:200]}...")

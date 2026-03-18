@@ -5,6 +5,8 @@ import sys
 
 def test_backend_rag():
     """Test the backend RAG API endpoint"""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     # Backend URL (adjust if different)
     backend_url = "http://localhost:8000"
     

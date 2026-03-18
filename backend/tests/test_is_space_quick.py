@@ -1,6 +1,8 @@
 """
 Quick test to show IS space documents without full indexing
 """
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import os
 from dotenv import load_dotenv

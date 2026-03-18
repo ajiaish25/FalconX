@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Explain how Jira queries are processed"""
 print("=" * 70)
 print("HOW JIRA QUERIES ARE PROCESSED")

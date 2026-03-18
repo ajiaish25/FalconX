@@ -1332,12 +1332,11 @@ async def auto_connect_integrations():
                 scheduler.start()
                 logger.info("✅ Automated indexing scheduler started")
             
-            # Trigger FULL Confluence index on first connection (background task)
+            # Warm up index on first connection: full index only if store is empty
             if app_state.confluence_configured and app_state.confluence_client:
-                logger.info("🚀 Triggering FULL Confluence index (background task)...")
-                # Run in background to not block the response
-                asyncio.create_task(scheduler._index_full_confluence())
-                logger.info("✅ Full Confluence indexing started in background")
+                logger.info("🚀 Triggering index warmup check (background task)...")
+                asyncio.create_task(scheduler.warmup_if_empty())
+                logger.info("✅ Index warmup task started in background")
         except Exception as e:
             logger.warning(f"⚠️ Failed to start indexing scheduler: {e}")
         
@@ -1491,6 +1490,31 @@ async def get_confluence_status():
             "email": mask_email(app_state.confluence_config.email) if app_state.confluence_config else None
         } if app_state.confluence_config else None
     }
+
+@app.get("/api/index-status", tags=["CONFLUENCE"], summary="Get Confluence Index Status")
+async def get_index_status():
+    """
+    Returns the real-time status of the Confluence vector index.
+    Use this to show a progress indicator while the index is being built.
+
+    Response fields:
+      - is_indexing    : bool  — true while a full/incremental index is running
+      - phase          : str   — current phase name (idle | warmup | full_confluence | ...)
+      - progress_pct   : int   — 0-100 percentage of current phase
+      - doc_count      : int   — total chunks currently in the vector store
+      - last_indexed_at: str   — ISO timestamp of last successful completion
+      - last_error     : str   — last error message, or null
+      - scheduler_running: bool — whether the background scheduler is active
+    """
+    try:
+        from services.indexing_scheduler import get_indexing_scheduler
+        scheduler = get_indexing_scheduler()
+        status = scheduler.get_status() if scheduler else {"phase": "not_initialized", "is_indexing": False}
+        return {"success": True, **status}
+    except Exception as e:
+        logger.warning(f"Failed to get index status: {e}")
+        return {"success": False, "error": str(e), "is_indexing": False, "doc_count": 0}
+
 
 @app.post("/api/confluence/disconnect")
 async def disconnect_confluence():

@@ -12,6 +12,8 @@ from services.rag_handler import get_handler
 
 def test_query():
     """Test the onboarding procedure query"""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     print("=" * 70)
     print("Testing RAG Query: 'onboarding procedure'")
     print("=" * 70)

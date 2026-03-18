@@ -2,6 +2,8 @@
 End-to-end test for full Confluence indexing flow
 Tests the complete workflow from connection to query
 """
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import os
 from dotenv import load_dotenv

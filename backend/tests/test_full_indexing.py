@@ -1,6 +1,8 @@
 """
 Test script for full Confluence indexing implementation
 """
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import os
 import sys

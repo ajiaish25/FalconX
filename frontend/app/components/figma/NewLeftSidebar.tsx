@@ -189,13 +189,13 @@ export function NewLeftSidebar({
   return (
     <>
       <aside className={`w-64 border-r flex flex-col h-full overflow-hidden transition-all duration-500 ease-in-out ${
-        isDarkMode 
-          ? 'bg-gray-900 border-gray-700' 
+        isDarkMode
+          ? 'bg-[#0D0D14] border-white/[0.06]'
           : 'bg-white border-gray-200'
       }`}>
         {/* Header */}
-        <div className={`p-6 border-b transition-all duration-300 ${
-          isDarkMode ? 'border-gray-700' : 'border-gray-200'
+        <div className={`p-5 border-b transition-all duration-300 ${
+          isDarkMode ? 'border-white/[0.06]' : 'border-gray-200'
         }`}>
           <div className="flex items-center space-x-3">
             <div 
@@ -251,203 +251,155 @@ export function NewLeftSidebar({
           <div className="p-4 space-y-6">
             {/* Navigation */}
             <div className="space-y-2">
-              <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 transition-colors duration-300 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+              <h4 className={`text-[10px] font-semibold uppercase tracking-widest mb-2 px-1 ${
+                isDarkMode ? 'text-slate-600' : 'text-gray-400'
               }`}>
                 Navigation
               </h4>
               
               {/* Work Buddy */}
-       <Button
-         variant={activeView === 'copilot' ? 'default' : 'ghost'}
-         className={`w-full justify-start h-12 px-4 rounded-xl transition-all duration-300 ${
-           activeView === 'copilot'
-             ? 'text-white shadow-lg hover:shadow-xl hover:scale-[1.02]'
-             : isDarkMode
-               ? 'text-gray-200 hover:bg-gray-800/50 hover:text-white hover:shadow-md'
-               : 'text-gray-800 hover:bg-gray-50/80 hover:shadow-md'
-         }`}
-         style={activeView === 'copilot' ? {
-           background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-         } : {}}
-         onClick={() => setActiveView('copilot')}
-       >
-                <div className="flex items-center space-x-3">
-                  <Bot className="w-5 h-5" />
-                  <div className="text-left">
-                    <div className="font-medium">Work Buddy</div>
-                    <div className="text-xs opacity-80">AI Assistant</div>
-                  </div>
+              <button
+                onClick={() => setActiveView('copilot')}
+                className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-all duration-200 group relative ${
+                  activeView === 'copilot'
+                    ? isDarkMode
+                      ? 'bg-indigo-500/10 text-white'
+                      : 'bg-indigo-50 text-indigo-700'
+                    : isDarkMode
+                      ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                {activeView === 'copilot' && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-500 rounded-r-full" />
+                )}
+                <Bot className={`w-4.5 h-4.5 flex-shrink-0 transition-colors ${activeView === 'copilot' ? 'text-indigo-400' : ''}`} />
+                <div className="text-left min-w-0">
+                  <div className="text-sm font-medium leading-none">Work Buddy</div>
+                  <div className="text-[11px] opacity-60 mt-0.5">AI Assistant</div>
                 </div>
-              </Button>
+              </button>
 
               {/* Insights - Converted to Dropdown */}
-              <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-between h-12 px-4 rounded-xl transition-all duration-300 ${
-                    activeView === 'insights' || activeView === 'github-insights'
-                      ? 'text-white shadow-lg hover:shadow-xl hover:scale-[1.02]'
-                      : isDarkMode
-                        ? 'text-gray-200 hover:bg-gray-800/50 hover:text-white hover:shadow-md'
-                        : 'text-gray-800 hover:bg-gray-50/80 hover:shadow-md'
-                  }`}
-                  style={(activeView === 'insights' || activeView === 'github-insights') ? {
-                    background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-                  } : {}}
+              <div className="space-y-0.5">
+                <button
                   onClick={() => setInsightsExpanded(!insightsExpanded)}
+                  className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-all duration-200 group relative ${
+                    activeView === 'insights' || activeView === 'github-insights'
+                      ? isDarkMode
+                        ? 'bg-indigo-500/10 text-white'
+                        : 'bg-indigo-50 text-indigo-700'
+                      : isDarkMode
+                        ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <BarChart3 className="w-5 h-5" />
-                    <div className="text-left">
-                      <div className="font-medium">Insights</div>
-                      <div className="text-xs opacity-80">Analytics</div>
-                    </div>
-                  </div>
-                  {insightsExpanded ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
+                  {(activeView === 'insights' || activeView === 'github-insights') && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-500 rounded-r-full" />
                   )}
-                </Button>
+                  <BarChart3 className={`w-4 h-4 flex-shrink-0 ${activeView === 'insights' || activeView === 'github-insights' ? 'text-indigo-400' : ''}`} />
+                  <div className="text-left flex-1 min-w-0">
+                    <div className="text-sm font-medium leading-none">Insights</div>
+                    <div className="text-[11px] opacity-60 mt-0.5">Analytics</div>
+                  </div>
+                  {insightsExpanded
+                    ? <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+                    : <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                  }
+                </button>
 
                 {insightsExpanded && (
-                  <div className="ml-4 space-y-1">
+                  <div className="ml-7 pl-3 border-l border-white/[0.06] space-y-0.5">
                     {/* Jira Insights */}
-                    <Button
-                      variant="ghost"
-                      className={`w-full justify-start h-10 text-sm px-3 rounded-lg transition-all duration-300 ${
-                        activeView === 'insights'
-                          ? 'text-white shadow'
-                          : isDarkMode
-                            ? 'text-gray-300 hover:text-white hover:bg-gray-800/50'
-                            : 'text-gray-700 hover:bg-gray-50/80'
-                      }`}
-                      style={activeView === 'insights' ? {
-                        background: `linear-gradient(90deg, ${currentTheme.colors.primary}CC, ${currentTheme.colors.secondary}CC)`
-                      } : {}}
+                    <button
                       onClick={() => setActiveView('insights')}
+                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
+                        activeView === 'insights'
+                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
                     >
-                      <Database className="w-4 h-4 mr-2" />
+                      <Database className="w-3.5 h-3.5 flex-shrink-0" />
                       Jira Insights
-                    </Button>
+                    </button>
 
                     {/* GitHub Insights */}
-                    <Button
-                      variant="ghost"
-                      className={`w-full justify-start h-10 text-sm px-3 rounded-lg transition-all duration-300 ${
-                        activeView === 'github-insights'
-                          ? 'text-white shadow'
-                          : isDarkMode
-                            ? 'text-gray-300 hover:text-white hover:bg-gray-800/50'
-                            : 'text-gray-700 hover:bg-gray-50/80'
-                      }`}
-                      style={activeView === 'github-insights' ? {
-                        background: `linear-gradient(90deg, ${currentTheme.colors.primary}CC, ${currentTheme.colors.secondary}CC)`
-                      } : {}}
+                    <button
                       onClick={() => setActiveView('github-insights')}
+                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
+                        activeView === 'github-insights'
+                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
                     >
-                      <Code className="w-4 h-4 mr-2" />
+                      <Code className="w-3.5 h-3.5 flex-shrink-0" />
                       GitHub Insights
-                    </Button>
+                    </button>
                   </div>
                 )}
               </div>
 
               {/* Metrics - Collapsible Section */}
-              <div className="space-y-1">
-                <Button
-                  variant={['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView) ? 'default' : 'ghost'}
-                  className={`w-full justify-between h-12 px-4 rounded-xl transition-all duration-300 ${
-                    ['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView)
-                      ? 'text-white shadow-lg hover:shadow-xl'
-                      : isDarkMode
-                        ? 'text-gray-200 hover:bg-gray-800/50 hover:text-white'
-                        : 'text-gray-800 hover:bg-gray-50/80'
-                  }`}
-                  style={['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView) ? {
-                    background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-                  } : {}}
+              <div className="space-y-0.5">
+                <button
                   onClick={() => setMetricsExpanded(!metricsExpanded)}
+                  className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-all duration-200 relative ${
+                    ['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView)
+                      ? isDarkMode ? 'bg-indigo-500/10 text-white' : 'bg-indigo-50 text-indigo-700'
+                      : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="w-5 h-5" />
-                    <div className="text-left">
-                      <div className="font-medium">Metrics</div>
-                      <div className="text-xs opacity-80">Performance</div>
-                    </div>
-                  </div>
-                  {metricsExpanded ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
+                  {['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView) && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-500 rounded-r-full" />
                   )}
-                </Button>
+                  <TrendingUp className={`w-4 h-4 flex-shrink-0 ${['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView) ? 'text-indigo-400' : ''}`} />
+                  <div className="text-left flex-1 min-w-0">
+                    <div className="text-sm font-medium leading-none">Metrics</div>
+                    <div className="text-[11px] opacity-60 mt-0.5">Performance</div>
+                  </div>
+                  {metricsExpanded ? <ChevronDown className="w-3.5 h-3.5 opacity-50" /> : <ChevronRight className="w-3.5 h-3.5 opacity-50" />}
+                </button>
 
                 {metricsExpanded && (
-                  <div className="space-y-1 pl-4">
+                  <div className="ml-7 pl-3 border-l border-white/[0.06] space-y-0.5">
                     {/* TCOE Metrics */}
-                    <Button
-                      variant={activeView === 'tcoe-report' ? 'default' : 'ghost'}
-                      className={`w-full justify-start h-10 px-3 rounded-lg transition-all duration-300 ${
-                        activeView === 'tcoe-report'
-                          ? 'text-white shadow-md'
-                          : isDarkMode
-                            ? 'text-gray-300 hover:bg-gray-800/50 hover:text-white'
-                            : 'text-gray-700 hover:bg-gray-50/80'
-                      }`}
-                      style={activeView === 'tcoe-report' ? {
-                        background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-                      } : {}}
+                    <button
                       onClick={() => setActiveView('tcoe-report')}
+                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
+                        activeView === 'tcoe-report'
+                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
                     >
-                      <div className="flex items-center space-x-2">
-                        <Shield className="w-4 h-4" />
-                        <span className="text-sm font-medium">TCOE Metrics</span>
-                      </div>
-                    </Button>
+                      <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+                      TCOE Metrics
+                    </button>
 
                     {/* QE Metrics */}
-                    <Button
-                      variant={activeView === 'qa-metrics' ? 'default' : 'ghost'}
-                      className={`w-full justify-start h-10 px-3 rounded-lg transition-all duration-300 ${
-                        activeView === 'qa-metrics'
-                          ? 'text-white shadow-md'
-                          : isDarkMode
-                            ? 'text-gray-300 hover:bg-gray-800/50 hover:text-white'
-                            : 'text-gray-700 hover:bg-gray-50/80'
-                      }`}
-                      style={activeView === 'qa-metrics' ? {
-                        background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-                      } : {}}
+                    <button
                       onClick={() => setActiveView('qa-metrics')}
+                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
+                        activeView === 'qa-metrics'
+                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
                     >
-                      <div className="flex items-center space-x-2">
-                        <BarChart3 className="w-4 h-4" />
-                        <span className="text-sm font-medium">QE Metrics</span>
-                      </div>
-                    </Button>
+                      <BarChart3 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>QE Metrics</span>
+                    </button>
 
                     {/* KPI Metrics */}
-                    <Button
-                      variant={activeView === 'kpi-metrics' ? 'default' : 'ghost'}
-                      className={`w-full justify-start h-10 px-3 rounded-lg transition-all duration-300 ${
-                        activeView === 'kpi-metrics'
-                          ? 'text-white shadow-md'
-                          : isDarkMode
-                            ? 'text-gray-300 hover:bg-gray-800/50 hover:text-white'
-                            : 'text-gray-700 hover:bg-gray-50/80'
-                      }`}
-                      style={activeView === 'kpi-metrics' ? {
-                        background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-                      } : {}}
+                    <button
                       onClick={() => setActiveView('kpi-metrics')}
+                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
+                        activeView === 'kpi-metrics'
+                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
                     >
-                      <div className="flex items-center space-x-2">
-                        <Target className="w-4 h-4" />
-                        <span className="text-sm font-medium">KPI Metrics</span>
-                      </div>
-                    </Button>
+                      <Target className="w-3.5 h-3.5 flex-shrink-0" />
+                      KPI Metrics
+                    </button>
                   </div>
                 )}
               </div>
@@ -455,292 +407,112 @@ export function NewLeftSidebar({
 
             {/* Integrations */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
+              <div className="flex items-center justify-between px-1">
+                <h4 className={`text-[10px] font-semibold uppercase tracking-widest ${
+                  isDarkMode ? 'text-slate-600' : 'text-gray-400'
                 }`}>
                   Integrations
                 </h4>
-                <div className="flex items-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="flex items-center gap-1">
+                  <button
                     onClick={() => setShowThemeSelector(true)}
-                    className="h-6 w-6 p-0 rounded hover:bg-gray-100 text-gray-500 transition-colors duration-300"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = currentTheme.colors.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#6B7280';
-                    }}
+                    className={`h-5 w-5 flex items-center justify-center rounded transition-colors ${isDarkMode ? 'text-slate-600 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     <Palette className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  </button>
+                  <button
                     onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
-                    className="h-6 w-6 p-0 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                    className={`h-5 w-5 flex items-center justify-center rounded transition-colors ${isDarkMode ? 'text-slate-600 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
                   >
-                    {integrationsExpanded ? (
-                      <ChevronDown className="w-3 h-3" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3" />
-                    )}
-                  </Button>
+                    {integrationsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  </button>
                 </div>
               </div>
               
               {integrationsExpanded && (
-                <div className="space-y-1">
-                  {/* Jira */}
-                  <div
-                    className={`w-full h-12 flex items-center justify-between px-4 rounded-xl transition-all duration-300 ${
-                      isDarkMode
-                        ? 'text-gray-200 hover:bg-gray-800/50 hover:text-white'
-                        : 'text-gray-800 hover:bg-gray-50/80'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Database 
-                        className="w-5 h-5 transition-colors duration-300" 
-                        style={{
-                          color: connections.find(c => c.name === 'Jira')?.status === 'connected' 
-                            ? currentTheme.colors.primary 
-                            : (isDarkMode ? '#9CA3AF' : '#6B7280')
-                        }}
-                      />
-                      <div className="text-left">
-                        <div 
-                          className="font-medium transition-colors duration-300"
-                          style={{
-                            color: connections.find(c => c.name === 'Jira')?.status === 'connected' 
-                              ? currentTheme.colors.primary 
-                              : (isDarkMode ? '#D1D5DB' : '#374151')
-                          }}
-                        >Jira</div>
-                        <div 
-                          className="text-xs opacity-80 transition-colors duration-300"
-                          style={{
-                            color: connections.find(c => c.name === 'Jira')?.status === 'connected' 
-                              ? currentTheme.colors.primary 
-                              : (isDarkMode ? '#9CA3AF' : '#6B7280')
-                          }}
-                        >Project Management</div>
+                <div className="space-y-0.5">
+                  {[
+                    { name: 'Jira',       label: 'Project Management', icon: Database,  coming: false },
+                    { name: 'Confluence', label: 'Documentation',       icon: FileText,  coming: false },
+                    { name: 'QARP',       label: 'Quality Assurance',   icon: Shield,    coming: true  },
+                    { name: 'GitHub',     label: 'Code Repository',     icon: GitBranch, coming: false },
+                  ].map(({ name, label, icon: Icon, coming }) => {
+                    const conn = connections.find(c => c.name === name)
+                    const isConnected = conn?.status === 'connected'
+                    return (
+                      <div
+                        key={name}
+                        className={`flex items-center justify-between px-3 h-11 rounded-xl transition-all duration-200 ${
+                          coming ? 'opacity-40 cursor-default' : ''
+                        } ${isDarkMode ? 'hover:bg-white/[0.04]' : 'hover:bg-gray-50'}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className={`w-4 h-4 flex-shrink-0 ${
+                            isConnected ? 'text-indigo-400' : isDarkMode ? 'text-slate-500' : 'text-gray-400'
+                          }`} />
+                          <div className="min-w-0">
+                            <div className={`text-sm font-medium truncate ${
+                              isDarkMode ? isConnected ? 'text-white' : 'text-slate-300' : isConnected ? 'text-indigo-700' : 'text-gray-700'
+                            }`}>{name}</div>
+                            <div className={`text-[11px] truncate ${isDarkMode ? 'text-slate-600' : 'text-gray-400'}`}>{label}</div>
+                          </div>
+                        </div>
+                        {coming ? (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${isDarkMode ? 'border-white/10 text-slate-500' : 'border-gray-200 text-gray-400'}`}>
+                            Soon
+                          </span>
+                        ) : (
+                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            isConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-slate-600'
+                          }`} />
+                        )}
                       </div>
-                    </div>
-                    <div 
-                      className="w-2 h-2 rounded-full transition-colors duration-300" 
-                      style={{
-                        backgroundColor: connections.find(c => c.name === 'Jira')?.status === 'connected' 
-                          ? currentTheme.colors.success 
-                          : currentTheme.colors.error
-                      }}
-                    />
-                  </div>
-
-                  {/* Confluence */}
-                  <div
-                    className={`w-full h-12 flex items-center justify-between px-4 rounded-xl transition-all duration-300 ${
-                      isDarkMode
-                        ? 'text-gray-200 hover:bg-gray-800/50 hover:text-white'
-                        : 'text-gray-800 hover:bg-gray-50/80'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <FileText 
-                        className="w-5 h-5 transition-colors duration-300" 
-                        style={{
-                          color: connections.find(c => c.name === 'Confluence')?.status === 'connected' 
-                            ? currentTheme.colors.primary 
-                            : (isDarkMode ? '#9CA3AF' : '#6B7280')
-                        }}
-                      />
-                      <div className="text-left">
-                        <div 
-                          className="font-medium transition-colors duration-300"
-                          style={{
-                            color: connections.find(c => c.name === 'Confluence')?.status === 'connected' 
-                              ? currentTheme.colors.primary 
-                              : (isDarkMode ? '#D1D5DB' : '#374151')
-                          }}
-                        >Confluence</div>
-                        <div 
-                          className="text-xs opacity-80 transition-colors duration-300"
-                          style={{
-                            color: connections.find(c => c.name === 'Confluence')?.status === 'connected' 
-                              ? currentTheme.colors.primary 
-                              : (isDarkMode ? '#9CA3AF' : '#6B7280')
-                          }}
-                        >Documentation</div>
-                      </div>
-                    </div>
-                    <div 
-                      className="w-2 h-2 rounded-full transition-colors duration-300" 
-                      style={{
-                        backgroundColor: connections.find(c => c.name === 'Confluence')?.status === 'connected' 
-                          ? currentTheme.colors.success 
-                          : currentTheme.colors.error
-                      }}
-                    />
-                  </div>
-
-                  {/* QARP - Coming Soon */}
-                  <div
-                    className={`w-full min-h-[54px] flex items-center justify-between px-4 rounded-xl transition-all duration-300 opacity-60 ${
-                      isDarkMode
-                        ? 'text-gray-200'
-                        : 'text-gray-800'
-                    }`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <Shield 
-                        className="w-5 h-5 mt-0.5 transition-colors duration-300" 
-                        style={{
-                          color: isDarkMode ? '#9CA3AF' : '#6B7280'
-                        }}
-                      />
-                      <div className="text-left leading-tight">
-                        <div 
-                          className="font-medium transition-colors duration-300"
-                          style={{
-                            color: isDarkMode ? '#D1D5DB' : '#374151'
-                          }}
-                        >QARP</div>
-                        <div 
-                          className="text-xs opacity-80 transition-colors duration-300"
-                          style={{
-                            color: isDarkMode ? '#9CA3AF' : '#6B7280'
-                          }}
-                        >Quality Assurance</div>
-                      </div>
-                    </div>
-                    <Badge 
-                      variant="outline" 
-                      className="text-xs px-3 py-1 self-center"
-                      style={{
-                        borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        minWidth: 96,
-                        textAlign: 'center'
-                      }}
-                    >
-                      Coming Soon
-                    </Badge>
-                  </div>
-
-                  {/* GitHub */}
-                  <div
-                    className={`w-full min-h-[54px] flex items-center justify-between px-4 rounded-xl transition-all duration-300 ${
-                      isDarkMode
-                        ? 'text-gray-200 hover:bg-gray-800/50 hover:text-white'
-                        : 'text-gray-800 hover:bg-gray-50/80'
-                    }`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <Code 
-                        className="w-5 h-5 mt-0.5 transition-colors duration-300" 
-                        style={{
-                          color: connections.find(c => c.name === 'GitHub')?.status === 'connected' 
-                            ? currentTheme.colors.primary 
-                            : (isDarkMode ? '#9CA3AF' : '#6B7280')
-                        }}
-                      />
-                      <div className="text-left leading-tight">
-                        <div 
-                          className="font-medium transition-colors duration-300"
-                          style={{
-                            color: connections.find(c => c.name === 'GitHub')?.status === 'connected' 
-                              ? currentTheme.colors.primary 
-                              : (isDarkMode ? '#D1D5DB' : '#374151')
-                          }}
-                        >GitHub</div>
-                        <div 
-                          className="text-xs opacity-80 transition-colors duration-300"
-                          style={{
-                            color: connections.find(c => c.name === 'GitHub')?.status === 'connected' 
-                              ? currentTheme.colors.primary 
-                              : (isDarkMode ? '#9CA3AF' : '#6B7280')
-                          }}
-                        >Code Repository</div>
-                      </div>
-                    </div>
-                    <div 
-                      className="w-2 h-2 rounded-full transition-colors duration-300 self-center" 
-                      style={{
-                        backgroundColor: connections.find(c => c.name === 'GitHub')?.status === 'connected' 
-                          ? currentTheme.colors.success 
-                          : currentTheme.colors.error
-                      }}
-                    />
-                  </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {!hasActiveConnections && (
-                <Button
-                  size="sm"
+                <button
                   onClick={() => setShowSettings(true)}
-                  className="w-full h-10 font-medium rounded-xl text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
-                  style={{
-                    background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `linear-gradient(90deg, ${currentTheme.colors.secondary}, ${currentTheme.colors.primary})`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`;
-                  }}
+                  className="w-full h-9 flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all duration-200 active:scale-[0.98]"
                 >
-                  <Plug className="w-4 h-4 mr-2" />
-                  Connect
-                </Button>
+                  <Plug className="w-3.5 h-3.5" />
+                  Connect Integrations
+                </button>
               )}
-              
               {hasActiveConnections && (
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                <div className="space-y-1.5">
+                  <button
                     onClick={() => setShowSettings(true)}
-                    className={`w-full h-9 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg ${
+                    className={`w-full h-9 flex items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
                       isDarkMode
-                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-gray-500'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400'
+                        ? 'border-white/10 text-slate-300 hover:text-white hover:bg-white/[0.04] hover:border-white/20'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
-                    <Settings className="w-4 h-4 mr-2" />
+                    <Settings className="w-3.5 h-3.5" />
                     Manage
-                  </Button>
-                  
+                  </button>
                   {connections.some(c => c.status === 'connected') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={async () => {
                         try { await fetch('http://localhost:8000/api/jira/disconnect', { method: 'POST' }) } catch {}
                         try { await fetch('http://localhost:8000/api/confluence/disconnect', { method: 'POST' }) } catch {}
-                        // Force immediate UI update; polling will keep it accurate
-                        const reset = connections.map(c => (
-                          c.name === 'Jira' || c.name === 'Confluence'
-                            ? { ...c, status: 'disconnected' as const }
-                            : c
-                        ))
-                        // Use setter passed via props
                         try { toggleConnection(-1) } catch {}
                       }}
-                      className={`w-full h-9 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg ${
+                      className={`w-full h-9 flex items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
                         isDarkMode
-                          ? 'border-red-600 text-red-400 hover:bg-red-900/20 hover:text-red-300 hover:border-red-500'
-                          : 'border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-400'
+                          ? 'border-red-500/20 text-red-400 hover:bg-red-500/10 hover:border-red-500/40'
+                          : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
                       }`}
                     >
-                      <WifiOff className="w-4 h-4 mr-2" />
+                      <WifiOff className="w-3.5 h-3.5" />
                       Disconnect All
-                    </Button>
+                    </button>
                   )}
                 </div>
               )}
@@ -748,95 +520,51 @@ export function NewLeftSidebar({
 
             {/* Quick Actions */}
             <div className="space-y-2">
-              <h4 className={`text-xs font-medium uppercase tracking-wider transition-colors duration-300 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+              <h4 className={`text-[10px] font-semibold uppercase tracking-widest px-1 ${
+                isDarkMode ? 'text-slate-600' : 'text-gray-400'
               }`}>
                 Quick Actions
               </h4>
-              
-              <div className="space-y-1">
-                {quickActions.map((action, index) => (
-                  <Button
+              <div className="space-y-0.5">
+                {quickActions.map((action) => (
+                  <button
                     key={action.label}
-                    variant="ghost"
-                    className={`w-full h-10 flex items-center justify-start px-3 rounded-xl transition-all duration-300 ${
+                    onClick={() => onQuickAction(action.prompt)}
+                    className={`w-full flex items-center gap-3 h-10 px-3 rounded-xl text-left transition-all duration-200 group ${
                       isDarkMode
-                        ? 'text-white hover:bg-gray-800/50 hover:shadow-md'
-                        : 'text-black hover:bg-gray-50/80 hover:shadow-md'
+                        ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = currentTheme.colors.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = isDarkMode ? '#FFFFFF' : '#000000';
-                    }}
-                    onClick={() => {
-                      onQuickAction(action.prompt)
-                    }}
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-1.5 rounded-lg transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
-                      }`}>
-                        <action.icon className={`w-3.5 h-3.5 transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`} />
-                      </div>
-                      <div className="text-left">
-                        <div
-                          className="font-medium text-sm transition-colors duration-300"
-                          style={{ color: currentTheme.colors.primary }}
-                        >{action.label}</div>
-                        <div className={`text-xs transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-600'
-                        }`}>{action.subtext}</div>
-                      </div>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+                      isDarkMode ? 'bg-white/[0.06] group-hover:bg-indigo-500/20' : 'bg-gray-100 group-hover:bg-indigo-50'
+                    }`}>
+                      <action.icon className={`w-3.5 h-3.5 transition-colors duration-200 ${
+                        isDarkMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-gray-500 group-hover:text-indigo-600'
+                      }`} />
                     </div>
-                  </Button>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium leading-none truncate">{action.label}</div>
+                      <div className={`text-[11px] mt-0.5 truncate ${isDarkMode ? 'text-slate-600' : 'text-gray-400'}`}>{action.subtext}</div>
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
           </div>
         </ScrollArea>
         
-        {/* About Us Link */}
-        <div className={`p-4 border-t transition-colors duration-300 ${
-          isDarkMode ? 'border-gray-700' : 'border-gray-200'
-        }`}>
-          <Button
+        {/* Footer */}
+        <div className={`px-4 py-3 border-t ${isDarkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+          <button
             onClick={() => setShowAboutUs(true)}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200"
-            style={{
-              backgroundColor: isDarkMode ? currentTheme.colors.surface : `${currentTheme.colors.surface}80`,
-              color: currentTheme.colors.text,
-              borderColor: currentTheme.colors.border
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = `${currentTheme.colors.primary}20`;
-              e.currentTarget.style.color = currentTheme.colors.primary;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? currentTheme.colors.surface : `${currentTheme.colors.surface}80`;
-              e.currentTarget.style.color = currentTheme.colors.text;
-            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+              isDarkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
           >
-            <div 
-              className="p-2 rounded-lg transition-colors duration-300"
-              style={{
-                backgroundColor: `${currentTheme.colors.primary}20`,
-                borderColor: `${currentTheme.colors.primary}40`
-              }}
-            >
-              <Globe 
-                className="w-4 h-4 transition-colors duration-300" 
-                style={{ color: currentTheme.colors.primary }}
-              />
-            </div>
-            <span 
-              className="font-medium text-sm transition-colors duration-300"
-              style={{ color: currentTheme.colors.text }}
-            >About Us</span>
-          </Button>
+            <Globe className="w-4 h-4 flex-shrink-0" />
+            <span className="text-sm font-medium">About Us</span>
+          </button>
         </div>
       </aside>
 
@@ -850,32 +578,16 @@ export function NewLeftSidebar({
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50"
           >
-            <div className={`rounded-lg p-4 shadow-2xl border transition-colors duration-300 ${
-              isDarkMode
-                ? 'bg-gray-800 border-gray-700'
-                : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center space-x-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                }`}>
-                  <CheckCircle className={`w-5 h-5 transition-colors duration-300 ${
-                    isDarkMode ? 'text-green-400' : 'text-green-600'
-                  }`} />
-                </div>
-                <div>
-                  <h3 className={`font-semibold text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-black'
-                  }`}>
-                    {showConnectedPopup === 'atlassian' ? 'Atlassian' : 
-                     showConnectedPopup === 'github' ? 'GitHub' : 'Slack'} Connected!
-                  </h3>
-                  <p className={`text-xs transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    Integration is now active
-                  </p>
-                </div>
+            <div className="bg-[#16161F] border border-white/10 rounded-2xl p-4 shadow-2xl shadow-black/40 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm text-white">
+                  {showConnectedPopup === 'atlassian' ? 'Atlassian' :
+                   showConnectedPopup === 'github' ? 'GitHub' : 'Integration'} Connected
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Integration is now active</p>
               </div>
             </div>
           </motion.div>

@@ -198,59 +198,131 @@ This is a specific issue query for {specific_issue_key}."""
     
     def _extract_names_relaxed(self, query: str) -> List[str]:
         """
-        Accept lowercase names, handle possessives, and consult alias map.
+        Extract names with proper format handling:
+        - "Ajith" = single person (first name only)
+        - "Ajith,Ramesh" or "Ajith Ramesh" = same person (first + last name)
+        - "ajith and ramesh" = two different persons (when 'and' is used)
+        
+        Also handles possessives and consults alias map.
         """
-        words = re.findall(r"[A-Za-z']+", query)
+        query_lower = query.lower()
         names = []
-        buff = []
-
+        
         skip = {
             'worked','assigned','assignee','who','is','has','on','to','the','a','an','show','me',
             'tickets','what','working','does','have','tell','about','give','list','all','find',
             'search','for','tasks','stories','bugs','issues','items','work','done','progress',
             'current','sprint','open','closed','in','project'
         }
-
-        for raw in words:
-            w = self._strip_possessive(raw)
-            if not w or w in skip:
-                if buff: 
-                    names.append(" ".join(buff))
-                    buff = []
-                continue
-            
-            # Alias direct hit (handles lowercase singletons like 'ashwini')
-            if w in self.name_aliases:
-                if buff: 
-                    names.append(" ".join(buff))
-                    buff = []
-                names.append(self.name_aliases[w])
-                continue
-            
-            # Keep capitalized sequences as names too
-            if raw and raw[0].isupper():
-                buff.append(raw)
-            else:
-                if buff: 
-                    names.append(" ".join(buff))
-                    buff = []
-
-        if buff: 
-            names.append(" ".join(buff))
         
-        # Normalize single lowercase tokens that might be names
-        out = []
-        for n in names:
-            nn = n.strip()
-            if not nn: 
-                continue
-            low = nn.lower()
-            out.append(self.name_aliases.get(low, nn))
+        # Check if "and" is present - indicates multiple people
+        if ' and ' in query_lower:
+            # Split by "and" to get multiple people
+            parts = re.split(r'\s+and\s+', query_lower)
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                
+                # Check if this part has comma (e.g., "ajith,ramesh" = one person)
+                if ',' in part:
+                    # Comma-separated = one person (first,last)
+                    name_parts = [p.strip() for p in part.split(',')]
+                    full_name = ' '.join([p.title() for p in name_parts if p])
+                    if full_name:
+                        # Check alias map
+                        alias_name = self.name_aliases.get(full_name.lower(), full_name)
+                        names.append(alias_name)
+                else:
+                    # Extract words from this part
+                    words = re.findall(r"[A-Za-z']+", part)
+                    name_words = []
+                    for w in words:
+                        w_clean = self._strip_possessive(w)
+                        if w_clean and w_clean not in skip:
+                            # Check alias
+                            if w_clean in self.name_aliases:
+                                name_words = [self.name_aliases[w_clean]]
+                                break
+                            name_words.append(w_clean)
+                    
+                    if name_words:
+                        if len(name_words) >= 2:
+                            # Multiple words = full name (one person)
+                            full_name = ' '.join([w.title() for w in name_words])
+                            names.append(self.name_aliases.get(full_name.lower(), full_name))
+                        elif len(name_words) == 1:
+                            # Single word = first name only
+                            first_name = name_words[0].title()
+                            names.append(self.name_aliases.get(first_name.lower(), first_name))
+        else:
+            # No "and" - treat as single person (could be first name, or first+last)
+            # Check for comma-separated (e.g., "Ajith,Ramesh")
+            if ',' in query:
+                # Comma-separated = one person
+                name_parts = [p.strip() for p in query.split(',')]
+                full_name = ' '.join([p.title() for p in name_parts if p])
+                if full_name:
+                    names.append(self.name_aliases.get(full_name.lower(), full_name))
+            else:
+                # Extract name patterns from query
+                words = re.findall(r"[A-Za-z']+", query)
+                name_words = []
+                
+                for raw in words:
+                    w = self._strip_possessive(raw.lower())
+                    if not w or w in skip:
+                        if name_words:
+                            # Found a complete name, add it
+                            if len(name_words) >= 2:
+                                full_name = ' '.join([nw.title() for nw in name_words])
+                                names.append(self.name_aliases.get(full_name.lower(), full_name))
+                            elif len(name_words) == 1:
+                                first_name = name_words[0].title()
+                                names.append(self.name_aliases.get(first_name.lower(), first_name))
+                            name_words = []
+                        continue
+                    
+                    # Check alias
+                    if w in self.name_aliases:
+                        if name_words:
+                            # Finish current name first
+                            if len(name_words) >= 2:
+                                full_name = ' '.join([nw.title() for nw in name_words])
+                                names.append(self.name_aliases.get(full_name.lower(), full_name))
+                            elif len(name_words) == 1:
+                                first_name = name_words[0].title()
+                                names.append(self.name_aliases.get(first_name.lower(), first_name))
+                        names.append(self.name_aliases[w])
+                        name_words = []
+                    else:
+                        # Keep capitalized sequences as names
+                        if raw and raw[0].isupper():
+                            name_words.append(w)
+                        else:
+                            # Lowercase word - might be part of name or separate
+                            if name_words:
+                                name_words.append(w)
+                            else:
+                                # Check if it's a known first name
+                                if w in self.name_aliases:
+                                    names.append(self.name_aliases[w])
+                                else:
+                                    name_words.append(w)
+                
+                # Handle remaining name_words
+                if name_words:
+                    if len(name_words) >= 2:
+                        full_name = ' '.join([nw.title() for nw in name_words])
+                        names.append(self.name_aliases.get(full_name.lower(), full_name))
+                    elif len(name_words) == 1:
+                        first_name = name_words[0].title()
+                        names.append(self.name_aliases.get(first_name.lower(), first_name))
         
         # Deduplicate while preserving order (case-insensitive)
         seen_lower = set()
         deduped: List[str] = []
-        for val in out:
+        for val in names:
             key = val.lower()
             if key in seen_lower:
                 continue

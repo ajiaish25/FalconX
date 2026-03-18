@@ -1,6 +1,8 @@
 """
 Test script to index IS (Intelligent Suite) space and show documents
 """
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import os
 from dotenv import load_dotenv

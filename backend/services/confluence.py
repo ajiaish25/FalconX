@@ -170,19 +170,66 @@ class ConfluenceClient:
 
     @staticmethod
     def storage_html_to_text(storage_html: str) -> str:
-        """Very simple HTML to text conversion for Confluence storage format."""
+        """
+        Advanced HTML to text conversion for Confluence storage format.
+        Properly handles: tables, lists, headings, code blocks, and nested structures.
+        """
         try:
-            import re, html
-            # Replace <br/> and </p> with newlines
-            text = storage_html.replace("<br/>", "\n").replace("<br>", "\n")
-            text = re.sub(r"</p>", "\n\n", text)
-            # Strip all remaining tags
-            text = re.sub(r"<[^>]+>", "", text)
-            # Unescape HTML entities
-            text = html.unescape(text)
-            # Normalize spaces
-            text = re.sub(r"\n{3,}", "\n\n", text).strip()
-            return text
+            import re, html as html_mod
+
+            text = storage_html
+
+            # --- Code blocks: preserve content with label ---
+            text = re.sub(r'<ac:structured-macro[^>]*ac:name="code"[^>]*>(.*?)</ac:structured-macro>',
+                          lambda m: '\n[CODE]\n' + re.sub(r'<[^>]+>', '', m.group(1)) + '\n[/CODE]\n',
+                          text, flags=re.DOTALL | re.IGNORECASE)
+
+            # --- Headings: h1-h6 with separator lines ---
+            def heading_replace(m):
+                level = int(m.group(1))
+                content = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+                prefix = '#' * level
+                return f"\n\n{prefix} {content}\n"
+            text = re.sub(r'<h([1-6])[^>]*>(.*?)</h\1>', heading_replace, text, flags=re.DOTALL | re.IGNORECASE)
+
+            # --- Tables: convert to readable grid ---
+            # Table header rows
+            text = re.sub(r'<th[^>]*>(.*?)</th>', lambda m: ' | ' + re.sub(r'<[^>]+>', '', m.group(1)).strip(), text, flags=re.DOTALL | re.IGNORECASE)
+            # Table data cells
+            text = re.sub(r'<td[^>]*>(.*?)</td>', lambda m: ' | ' + re.sub(r'<[^>]+>', '', m.group(1)).strip(), text, flags=re.DOTALL | re.IGNORECASE)
+            # Table rows
+            text = re.sub(r'<tr[^>]*>', '\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'</tr>', '', text, flags=re.IGNORECASE)
+            # Strip table wrappers
+            text = re.sub(r'</?t(?:able|head|body|foot)[^>]*>', '\n', text, flags=re.IGNORECASE)
+
+            # --- Lists ---
+            text = re.sub(r'<li[^>]*>(.*?)</li>', lambda m: '\n  - ' + re.sub(r'<[^>]+>', '', m.group(1)).strip(), text, flags=re.DOTALL | re.IGNORECASE)
+            text = re.sub(r'</?[uo]l[^>]*>', '\n', text, flags=re.IGNORECASE)
+
+            # --- Paragraphs and line breaks ---
+            text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'</p>', '\n\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'<p[^>]*>', '', text, flags=re.IGNORECASE)
+
+            # --- Bold/italic: just strip tags (keep content) ---
+            text = re.sub(r'<(?:strong|b|em|i|u|s)[^>]*>(.*?)</(?:strong|b|em|i|u|s)>', r'\1', text, flags=re.DOTALL | re.IGNORECASE)
+
+            # --- Links: keep link text ---
+            text = re.sub(r'<a[^>]*>(.*?)</a>', r'\1', text, flags=re.DOTALL | re.IGNORECASE)
+
+            # --- Strip all remaining HTML tags ---
+            text = re.sub(r'<[^>]+>', '', text)
+
+            # --- Unescape HTML entities ---
+            text = html_mod.unescape(text)
+
+            # --- Normalize whitespace ---
+            text = re.sub(r'[ \t]+', ' ', text)
+            text = re.sub(r'\n[ \t]+', '\n', text)
+            text = re.sub(r'\n{3,}', '\n\n', text)
+
+            return text.strip()
         except Exception:
             return storage_html
 
@@ -277,14 +324,14 @@ class ConfluenceClient:
         return all_spaces
     
     async def get_all_pages_in_space(self, space_key: str) -> List[Dict[str, Any]]:
-        """Get all pages from a specific space (paginated)"""
+        """Get all pages from a specific space (paginated), including ancestors for hierarchy."""
         if not self._client:
             await self.initialize()
-        
+
         all_pages = []
         start = 0
         limit = 100  # Confluence API limit
-        
+
         while True:
             url = f"{self.cfg.base_url}/rest/api/content"
             params = {
@@ -292,7 +339,8 @@ class ConfluenceClient:
                 "type": "page",
                 "limit": str(limit),
                 "start": str(start),
-                "expand": "body.storage,body.view,version,space,metadata"
+                # ancestors: gives full parent chain for breadcrumb building
+                "expand": "body.storage,version,space,metadata,ancestors"
             }
             try:
                 resp = await self._client.get(url, params=params, headers=self._headers())
@@ -322,6 +370,87 @@ class ConfluenceClient:
         logger.info(f"Retrieved {len(all_pages)} pages from space {space_key}")
         return all_pages
     
+    @staticmethod
+    def extract_relevant_content(page_text: str, query: str, max_chars: int = 2500) -> str:
+        """
+        Extract the most query-relevant sections from a long Confluence page.
+
+        Strategy:
+        1. Split page into paragraphs/sections
+        2. Score each section by query keyword overlap
+        3. Return top-scoring sections up to max_chars
+
+        Args:
+            page_text: Full plain-text content of the page
+            query: The user's search query
+            max_chars: Maximum characters to return
+
+        Returns:
+            Concatenated relevant sections, trimmed to max_chars
+        """
+        import re
+
+        if not page_text or len(page_text) <= max_chars:
+            return page_text
+
+        # Normalize query into keywords (ignore stop words)
+        stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+                      'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+                      'would', 'could', 'should', 'may', 'might', 'can', 'in',
+                      'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from',
+                      'and', 'or', 'but', 'if', 'then', 'this', 'that', 'it',
+                      'its', 'me', 'my', 'we', 'our', 'you', 'your'}
+        query_words = set(
+            w.lower() for w in re.findall(r'\w+', query)
+            if w.lower() not in stop_words and len(w) > 2
+        )
+
+        # Split into chunks (paragraphs and sections)
+        chunks = re.split(r'\n{2,}', page_text)
+
+        # Score each chunk
+        scored = []
+        for chunk in chunks:
+            chunk_stripped = chunk.strip()
+            if not chunk_stripped:
+                continue
+            chunk_lower = chunk_stripped.lower()
+            # Count keyword hits (weighted by frequency)
+            score = sum(chunk_lower.count(word) for word in query_words)
+            # Bonus for heading-like chunks (short, starts with #)
+            if chunk_stripped.startswith('#') or (len(chunk_stripped) < 80 and chunk_stripped.endswith(':')):
+                score += 2
+            scored.append((score, chunk_stripped))
+
+        # Sort by score descending, then reconstruct in original order preserving top sections
+        if not scored:
+            return page_text[:max_chars]
+
+        # Pick top sections up to max_chars, preserving document order
+        threshold = sorted(s for s, _ in scored)
+        median_score = threshold[len(threshold) // 2] if threshold else 0
+
+        # Take sections above median score, or if all zero, take first N chars
+        relevant = [chunk for score, chunk in scored if score >= max(median_score, 1)]
+        if not relevant:
+            # Fallback: return beginning of page (intro usually has overview)
+            return page_text[:max_chars]
+
+        # Rebuild maintaining original paragraph order
+        ordered = []
+        remaining_chars = max_chars
+        for score, chunk in scored:
+            if chunk in relevant and remaining_chars > 0:
+                ordered.append(chunk)
+                remaining_chars -= len(chunk)
+            if remaining_chars <= 0:
+                break
+
+        result = '\n\n'.join(ordered)
+        if len(result) > max_chars:
+            result = result[:max_chars] + "\n[... additional content available in full page ...]"
+        return result
+
     async def get_all_pages(self, space_keys: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Get all pages from all spaces (or specified spaces)
@@ -361,5 +490,95 @@ class ConfluenceClient:
         
         logger.info(f"✅ Retrieved {len(all_pages)} total pages from {len(spaces_to_index)} spaces")
         return all_pages
+
+    async def build_space_hierarchy(
+        self,
+        space_key: str
+    ) -> Dict[str, Any]:
+        """
+        Build a full parent-child hierarchy map for a Confluence space.
+
+        Returns a dict keyed by page_id:
+        {
+            "page_id": {
+                "title":     "GL Inquiry Workflow",
+                "parent_id": "parent_page_id_or_None",
+                "ancestors": [{"id": "...", "title": "..."}, ...],   # root → parent
+                "children":  ["child_id_1", "child_id_2", ...]
+            }
+        }
+
+        Uses the ancestors field fetched in get_all_pages_in_space() —
+        no extra API calls needed.
+        """
+        pages = await self.get_all_pages_in_space(space_key)
+
+        hierarchy: Dict[str, Any] = {}
+
+        # First pass: populate every page with its ancestors
+        for page in pages:
+            page_id    = page.get("id", "")
+            page_title = page.get("title", "Untitled")
+
+            if not page_id:
+                continue
+
+            raw_ancestors = page.get("ancestors", []) or []
+            # ancestors list from API is ordered root → immediate parent
+            ancestor_info = [
+                {"id": a.get("id", ""), "title": a.get("title", "")}
+                for a in raw_ancestors
+                if isinstance(a, dict) and a.get("id")
+            ]
+
+            parent_id = ancestor_info[-1]["id"] if ancestor_info else None
+
+            hierarchy[page_id] = {
+                "title":     page_title,
+                "parent_id": parent_id,
+                "ancestors": ancestor_info,
+                "children":  [],         # populated in second pass
+            }
+
+        # Second pass: wire up children lists
+        for page_id, info in hierarchy.items():
+            parent_id = info.get("parent_id")
+            if parent_id and parent_id in hierarchy:
+                hierarchy[parent_id]["children"].append(page_id)
+
+        root_pages = [pid for pid, info in hierarchy.items() if not info["parent_id"]]
+        logger.info(
+            f"[Hierarchy] Space {space_key}: {len(hierarchy)} pages, "
+            f"{len(root_pages)} root pages"
+        )
+        return hierarchy
+
+    async def build_full_hierarchy(
+        self,
+        space_keys: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Build a merged hierarchy map across all spaces (or specified spaces).
+        Returns the same format as build_space_hierarchy() but for all spaces.
+        """
+        if space_keys:
+            spaces_to_process = [{"key": k} for k in space_keys]
+        else:
+            spaces_to_process = await self.get_all_spaces()
+
+        full_hierarchy: Dict[str, Any] = {}
+
+        for space in spaces_to_process:
+            sk = space.get("key") or space.get("name", "")
+            if not sk:
+                continue
+            try:
+                space_hier = await self.build_space_hierarchy(sk)
+                full_hierarchy.update(space_hier)
+            except Exception as e:
+                logger.error(f"[Hierarchy] Failed for space {sk}: {e}")
+
+        logger.info(f"[Hierarchy] Full hierarchy: {len(full_hierarchy)} total pages")
+        return full_hierarchy
 
 

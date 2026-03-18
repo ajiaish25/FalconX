@@ -80,46 +80,115 @@ class DocumentIndexer:
         
         logger.info(f"✅ Indexed {len(issues)} Jira issues")
     
-    def _extract_confluence_text(self, page: Dict[str, Any]) -> str:
-        """Extract searchable text from a Confluence page"""
-        title = page.get('title', '')
-        body = page.get('body', {}).get('storage', {}).get('value', '')
-        
-        # Remove HTML tags (basic)
-        import re
-        body = re.sub(r'<[^>]+>', '', body)
-        
-        return f"{title} {body}".strip()
-    
-    async def index_confluence_pages(self, pages: List[Dict], confluence_base_url: str = ""):
-        """Index Confluence pages"""
-        logger.info(f"Indexing {len(pages)} Confluence pages...")
-        
+    async def index_confluence_pages(
+        self,
+        pages: List[Dict],
+        confluence_base_url: str = "",
+        hierarchy: Dict[str, Any] = None,
+        incremental: bool = False
+    ):
+        """
+        Index Confluence pages using smart chunking.
+
+        Each page is split into fine-grained chunks:
+          - table_row  : one chunk per table row (with column headers)
+          - section    : one chunk per heading block
+          - text       : overlapping 300-word chunks for long sections
+
+        Parent-child breadcrumbs are embedded in every chunk so results
+        show WHERE in the Confluence tree the answer came from.
+
+        Args:
+            pages:               Raw Confluence page dicts (body.storage expanded).
+            confluence_base_url: Base URL for building page links.
+            hierarchy:           Space hierarchy map from build_space_hierarchy().
+                                 Enables full breadcrumb paths.
+            incremental:         If True, skip pages whose last_modified hasn't changed.
+        """
+        from services.confluence_chunker import ConfluenceChunker
+
+        chunker = ConfluenceChunker(base_url=confluence_base_url)
+
+        total_chunks  = 0
+        skipped_pages = 0
+        updated_pages = 0
+
+        logger.info(f"[Indexer] Starting chunk-based indexing of {len(pages)} pages "
+                    f"(incremental={incremental})...")
+
         for page in pages:
+            page_id    = page.get("id", "")
+            page_title = page.get("title", "Unknown")
+
             try:
-                text = self._extract_confluence_text(page)
-                if not text.strip():
+                # --- Incremental change detection ---
+                if incremental and page_id and self.unified_rag.storage:
+                    version_obj   = page.get("version", {}) or {}
+                    last_modified = version_obj.get("when", "") if isinstance(version_obj, dict) else ""
+                    stored_ts = self.unified_rag.storage.get_page_last_modified(page_id)
+
+                    if stored_ts and stored_ts == last_modified:
+                        skipped_pages += 1
+                        logger.debug(f"[Indexer] Skipping unchanged page: {page_title}")
+                        continue
+
+                    # Page has changed — remove old chunks before re-indexing
+                    if stored_ts and page_id:
+                        removed = self.unified_rag.storage.delete_by_page_id(page_id)
+                        logger.debug(f"[Indexer] Removed {removed} stale chunks for '{page_title}'")
+                        # Also remove from in-memory store
+                        stale_ids = [
+                            k for k, v in self.unified_rag.vector_store.items()
+                            if v.metadata.get("page_id") == page_id
+                        ]
+                        for sid in stale_ids:
+                            del self.unified_rag.vector_store[sid]
+
+                # --- Chunk the page ---
+                chunks = chunker.chunk_page(page, hierarchy=hierarchy)
+                if not chunks:
                     continue
-                
-                page_id = page.get('id', '')
-                space_key = page.get('space', {}).get('key', '')
-                
-                metadata = {
-                    'id': page_id,
-                    'url': f"{confluence_base_url}/pages/viewpage.action?pageId={page_id}" if confluence_base_url else "",
-                    'title': page.get('title', ''),
-                    'space': space_key
-                }
-                
-                await self.unified_rag.index_document(
-                    text=text,
-                    source_type=SourceType.CONFLUENCE,
-                    metadata=metadata
-                )
+
+                # --- Index each chunk individually ---
+                for chunk in chunks:
+                    # Unique doc ID per chunk: confluence_<pageId>_chunk_<idx>
+                    chunk_doc_id = f"confluence_{page_id}_chunk_{chunk.chunk_index}"
+
+                    metadata = {
+                        "id":            chunk_doc_id,
+                        "page_id":       chunk.page_id,
+                        "title":         chunk.page_title,
+                        "space":         chunk.space_key,
+                        "space_name":    chunk.space_name,
+                        "url":           chunk.url,
+                        "breadcrumb":    chunk.breadcrumb,
+                        "parent_page_id": chunk.parent_page_id,
+                        "chunk_type":    chunk.chunk_type,
+                        "section_heading": chunk.section_heading,
+                        "table_name":    chunk.table_name,
+                        "row_index":     chunk.row_index,
+                        "chunk_index":   chunk.chunk_index,
+                        "last_modified": chunk.last_modified,
+                    }
+
+                    await self.unified_rag.index_document(
+                        text=chunk.text,
+                        source_type=SourceType.CONFLUENCE,
+                        metadata=metadata
+                    )
+
+                total_chunks  += len(chunks)
+                updated_pages += 1
+                logger.debug(f"[Indexer] '{page_title}' → {len(chunks)} chunks")
+
             except Exception as e:
-                logger.error(f"Failed to index Confluence page {page.get('id', 'unknown')}: {e}")
-        
-        logger.info(f"✅ Indexed {len(pages)} Confluence pages")
+                logger.error(f"[Indexer] Failed to index page '{page_title}' ({page_id}): {e}")
+
+        logger.info(
+            f"✅ [Indexer] Done — {updated_pages} pages indexed, "
+            f"{skipped_pages} unchanged pages skipped, "
+            f"{total_chunks} total chunks stored"
+        )
     
     def _extract_github_text(self, item: Dict[str, Any]) -> str:
         """Extract searchable text from a GitHub issue or PR"""

@@ -4,6 +4,8 @@ import json
 
 def test_query(query, description):
     """Test a single query"""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     backend_url = "http://localhost:8000"
     
     print(f"\n{'='*70}")
