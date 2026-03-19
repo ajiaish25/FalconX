@@ -20,6 +20,14 @@ class ConfluenceConfig:
     space_key: str = os.getenv("CONFLUENCE_SPACE_KEY", "")
 
 @dataclass
+class SalesforceConfig:
+    instance_url: str = os.getenv("SALESFORCE_INSTANCE_URL", "").rstrip("/")
+    client_id: str = os.getenv("SALESFORCE_CLIENT_ID", "")
+    client_secret: str = os.getenv("SALESFORCE_CLIENT_SECRET", "")
+    username: str = os.getenv("SALESFORCE_USERNAME", "")
+    password: str = os.getenv("SALESFORCE_PASSWORD", "")  # password + security token appended
+
+@dataclass
 class LLMConfig:
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")

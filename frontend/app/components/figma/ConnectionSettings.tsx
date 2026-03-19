@@ -485,17 +485,20 @@ export function FigmaConnectionSettings({
                         }}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
                             <Globe className="w-4 h-4" style={{ color: currentTheme.colors.accent }} />
                           </div>
                           <div>
                             <p className={`font-medium text-sm`} style={{ color: currentTheme.colors.text }}>Connection Status</p>
                             <div className="flex items-center space-x-2">
-                              <div className={`w-2 h-2 rounded-full ${
-                                connectionStatus.atlassian === 'connected' ? 'bg-green-500' :
-                                connectionStatus.atlassian === 'testing' ? 'bg-yellow-500 animate-pulse' :
-                                'bg-red-500'
-                              }`} />
+                              <div
+                                className={`w-2 h-2 rounded-full ${connectionStatus.atlassian === 'testing' ? 'animate-pulse' : ''}`}
+                                style={{
+                                  backgroundColor: connectionStatus.atlassian === 'connected' ? 'var(--accent-cool)' :
+                                                   connectionStatus.atlassian === 'testing' ? 'var(--amber)' :
+                                                   'var(--red)'
+                                }}
+                              />
                               <p className={`text-xs`} style={{ color: currentTheme.colors.textSecondary }}>
                                 {connectionStatus.atlassian === 'connected' ? 'Connected' :
                                  connectionStatus.atlassian === 'testing' ? 'Testing...' :
@@ -526,18 +529,13 @@ export function FigmaConnectionSettings({
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className={`p-4 rounded-lg border ${
-                            isDarkMode 
-                              ? 'bg-green-500/10 border-green-500/20' 
-                              : 'bg-green-50 border-green-200'
-                          }`}
+                          className="p-4 rounded-lg border"
+                          style={{ backgroundColor: 'var(--accent-cool-bg)', borderColor: 'rgba(212,168,71,0.2)' }}
                         >
                           <div className="flex items-center space-x-3 mb-3">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
+                            <CheckCircle className="w-5 h-5" style={{ color: 'var(--accent-cool)' }} />
                             <div>
-                              <p className={`font-medium text-sm ${
-                                isDarkMode ? 'text-green-400' : 'text-green-700'
-                              }`}>
+                              <p className="font-medium text-sm" style={{ color: 'var(--accent-cool)' }}>
                                 Configuration Details
                               </p>
                               <p className={`text-xs ${

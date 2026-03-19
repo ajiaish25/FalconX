@@ -1,30 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent } from './ui/card'
-import { Button } from './ui/button'
-import { 
-  MessageSquare, 
-  BarChart3, 
-  Crown, 
+import {
+  MessageSquare,
+  BarChart3,
+  Crown,
   ChevronRight,
-  Sparkles,
-  Users,
-  FileText,
   Target,
-  Activity
+  Activity,
+  Ticket
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface NavigationItem {
   id: string
   title: string
   description: string
   icon: React.ReactNode
-  color: string
-  gradient: string
-  accentColor: string
+  /** Icon foreground color: [dark, light] */
+  iconColors: [string, string]
+  /** Icon container background: [dark, light] */
+  iconBgs: [string, string]
 }
 
 interface NavigationProps {
@@ -33,152 +30,188 @@ interface NavigationProps {
 }
 
 export function Navigation({ activeItem, onItemClick }: NavigationProps) {
-  const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const { isDarkMode } = useTheme()
 
   const navigationItems: NavigationItem[] = [
     {
       id: 'chat',
       title: 'Leadership Copilot',
       description: 'AI-powered insights and analysis',
-      icon: <MessageSquare className="w-5 h-5" />,
-      color: 'text-blue-400',
-      gradient: 'from-blue-500/20 to-purple-500/20',
-      accentColor: 'border-blue-500/30'
+      icon: <MessageSquare style={{ width: 18, height: 18 }} />,
+      iconColors: ['#93C5FD', '#2563EB'],  // dark: light-blue, light: deep-blue
+      iconBgs:   ['#0D1A2E', '#EFF6FF'],   // dark: dark-blue tint, light: sky tint
     },
     {
       id: 'insights',
       title: 'Leadership Insights',
       description: 'Advanced analytics & patterns',
-      icon: <BarChart3 className="w-5 h-5" />,
-      color: 'text-purple-400',
-      gradient: 'from-purple-500/20 to-pink-500/20',
-      accentColor: 'border-purple-500/30'
+      icon: <BarChart3 style={{ width: 18, height: 18 }} />,
+      iconColors: ['#FCD34D', '#D97706'],
+      iconBgs:   ['#231A05', '#FFFBEB'],
     },
     {
       id: 'quality-metrics',
       title: 'TCOE Report',
       description: 'Defect Leakage Analysis',
-      icon: <Target className="w-5 h-5" />,
-      color: 'text-green-400',
-      gradient: 'from-green-500/20 to-emerald-500/20',
-      accentColor: 'border-green-500/30'
+      icon: <Target style={{ width: 18, height: 18 }} />,
+      iconColors: ['#4ADE80', '#16A34A'],
+      iconBgs:   ['#0D2818', '#F0FDF4'],
     },
     {
       id: 'qa-metrics',
       title: 'QA Metrics',
       description: 'Quality Engineering Dashboard',
-      icon: <Activity className="w-5 h-5" />,
-      color: 'text-cyan-400',
-      gradient: 'from-cyan-500/20 to-teal-500/20',
-      accentColor: 'border-cyan-500/30'
+      icon: <Activity style={{ width: 18, height: 18 }} />,
+      iconColors: ['#93C5FD', '#2563EB'],
+      iconBgs:   ['#0D1A2E', '#EFF6FF'],
     },
     {
       id: 'leadership',
       title: 'Leadership Access',
       description: 'Premium analytics & insights',
-      icon: <Crown className="w-5 h-5" />,
-      color: 'text-yellow-400',
-      gradient: 'from-yellow-500/20 to-orange-500/20',
-      accentColor: 'border-yellow-500/30'
-    }
+      icon: <Crown style={{ width: 18, height: 18 }} />,
+      iconColors: ['#FCD34D', '#D97706'],
+      iconBgs:   ['#231A05', '#FFFBEB'],
+    },
+    {
+      id: 'salesforce-insights',
+      title: 'Salesforce',
+      description: 'AI ticket triage & solutions',
+      icon: <Ticket style={{ width: 18, height: 18 }} />,
+      iconColors: ['#93C5FD', '#2563EB'],
+      iconBgs:   ['#0D1A2E', '#EFF6FF'],
+    },
   ]
 
   return (
-    <div className="space-y-4">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      {/* Section label */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.1 }}
-        className="flex items-center justify-between mb-6"
+        transition={{ duration: 0.5, delay: 0.1 }}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 16,
+        }}
       >
-        <h3 className="premium-caption text-white/80 tracking-wider">Navigation</h3>
-        <div className="w-12 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+        <span
+          style={{
+            fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+            letterSpacing: '0.08em', color: 'var(--text-muted)',
+          }}
+        >
+          Navigation
+        </span>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)', marginLeft: 12 }} />
       </motion.div>
-      
-      <div className="space-y-3">
-        {navigationItems.map((item, index) => (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onHoverStart={() => setHoveredItem(item.id)}
-            onHoverEnd={() => setHoveredItem(null)}
-          >
-            <Card 
-              className={`premium-card cursor-pointer group relative overflow-hidden ${
-                activeItem === item.id 
-                  ? 'ring-2 ring-blue-500/50 shadow-xl shadow-blue-500/20' 
-                  : 'hover:ring-1 hover:ring-white/20'
-              }`}
-              onClick={() => onItemClick(item.id)}
+
+      {/* Nav items */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {navigationItems.map((item, index) => {
+          const isActive = activeItem === item.id
+          const isHovered = hoveredItem === item.id
+          const iconColor = isDarkMode ? item.iconColors[0] : item.iconColors[1]
+          const iconBg    = isDarkMode ? item.iconBgs[0]    : item.iconBgs[1]
+
+          return (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 + index * 0.07 }}
+              onHoverStart={() => setHoveredItem(item.id)}
+              onHoverEnd={() => setHoveredItem(null)}
             >
-              {/* Background Gradient */}
-              <div className={`absolute inset-0 bg-gradient-to-r ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-              
-              {/* Shimmer Effect */}
-              {hoveredItem === item.id && (
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer-premium"></div>
-              )}
-              
-              <CardContent className="p-5 relative z-10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <motion.div 
-                      className={`p-3 rounded-xl bg-gradient-to-r ${item.gradient} backdrop-blur-sm border ${item.accentColor} ${
-                        activeItem === item.id ? 'shadow-lg shadow-blue-500/20' : ''
-                      }`}
-                      whileHover={{ rotate: 5 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className={item.color}>
-                        {item.icon}
-                      </div>
-                    </motion.div>
-                    <div className="flex-1">
-                      <h4 className={`premium-subheading text-base ${
-                        activeItem === item.id ? 'text-white' : 'text-white/90'
-                      }`}>
-                        {item.title}
-                      </h4>
-                      <p className={`premium-text text-sm mt-1 ${
-                        activeItem === item.id ? 'text-white/70' : 'text-white/50'
-                      }`}>
-                        {item.description}
-                      </p>
-                    </div>
-                  </div>
-                  
+              <button
+                onClick={() => onItemClick(item.id)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px', borderRadius: 12,
+                  cursor: 'pointer',
+                  background: isActive
+                    ? 'var(--bg-active)'
+                    : isHovered
+                    ? 'var(--bg-hover)'
+                    : 'var(--bg-card)',
+                  border: isActive
+                    ? '1px solid var(--border-strong)'
+                    : '1px solid var(--border)',
+                  transition: 'background 150ms, border-color 150ms',
+                  textAlign: 'left',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Active left accent bar */}
+                {isActive && (
                   <motion.div
-                    initial={false}
-                    animate={{ 
-                      opacity: activeItem === item.id || hoveredItem === item.id ? 1 : 0,
-                      x: activeItem === item.id || hoveredItem === item.id ? 0 : 10,
-                      scale: activeItem === item.id ? 1.1 : 1
+                    initial={{ height: 0 }}
+                    animate={{ height: '60%' }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    style={{
+                      position: 'absolute', left: 0, top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: 3, borderRadius: 99,
+                      background: iconColor,
                     }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="text-white/60"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </motion.div>
-                </div>
-                
-                {/* Active Indicator */}
-                {activeItem === item.id && (
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                    className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
                   />
                 )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {/* Icon container */}
+                  <div
+                    style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: iconBg,
+                      border: `1px solid ${iconColor}28`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, color: iconColor,
+                      transition: 'background 0.2s, border-color 0.2s',
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+
+                  {/* Text */}
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 13, fontWeight: 600, margin: 0,
+                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        transition: 'color 0.15s',
+                      }}
+                    >
+                      {item.title}
+                    </p>
+                    <p style={{
+                      fontSize: 11, margin: '2px 0 0',
+                      color: 'var(--text-muted)',
+                      transition: 'color 0.15s',
+                    }}>
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Chevron */}
+                <motion.div
+                  initial={false}
+                  animate={{
+                    opacity: isActive || isHovered ? 1 : 0,
+                    x: isActive || isHovered ? 0 : 6,
+                  }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+                >
+                  <ChevronRight style={{ width: 14, height: 14 }} />
+                </motion.div>
+              </button>
+            </motion.div>
+          )
+        })}
       </div>
     </div>
   )

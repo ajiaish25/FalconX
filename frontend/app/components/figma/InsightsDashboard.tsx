@@ -13,6 +13,7 @@ import { exportInsightsAsPDF } from '../../utils/exportUtils';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getApiUrl } from '../../../lib/api-config';
 import { LoadingSkeleton } from './InsightsDashboard/components/LoadingSkeleton';
+import { DashboardLayout } from '../DashboardLayout';
 
 interface Project {
   id: string;
@@ -95,6 +96,43 @@ interface HistoricalComparison {
   velocity: number;
 }
 
+interface IssueAgeItem {
+  range: string;
+  count: number;
+}
+
+interface DueDateRiskItem {
+  key: string;
+  summary: string;
+  dueDate: string;
+  assignee: string;
+  status: string;
+  priority: string;
+  isOverdue: boolean;
+}
+
+interface BlockerIssue {
+  key: string;
+  summary: string;
+  status: string;
+  assignee: string;
+  project: string;
+  url: string;
+  priority?: string;
+  labels?: string[];
+}
+
+interface Performer {
+  name: string;
+  issuesResolved: number;
+  storyPoints: number;
+  bugsFixed: number;
+  tasksCompleted: number;
+  performanceScore: number;
+  rank: number;
+  achievements: string[];
+}
+
 interface EnhancedJiraMetrics extends JiraMetrics {
   sprintVelocityTrends: SprintVelocity[];
   burndownData: BurndownData[];
@@ -108,6 +146,9 @@ interface EnhancedJiraMetrics extends JiraMetrics {
     velocity: number[];
     completionRate: number[];
   };
+  issueAgeDistribution?: IssueAgeItem[];
+  dueDateRisk?: DueDateRiskItem[];
+  latestSprintGoal?: string;
 }
 
 interface RecentActivity {
@@ -157,6 +198,12 @@ export default function InsightsDashboard() {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
+  // Blockers, performers, drill-down
+  const [blockers, setBlockers] = useState<{ blocked: BlockerIssue[]; flagged: BlockerIssue[] } | null>(null);
+  const [performers, setPerformers] = useState<Performer[]>([]);
+  const [blockersLoading, setBlockersLoading] = useState(false);
+  const [performersLoading, setPerformersLoading] = useState(false);
+
   // New state for enhanced features
   const [selectedChartView, setSelectedChartView] = useState<'velocity' | 'burndown' | 'capacity' | 'historical'>('velocity');
   const [showDrillDown, setShowDrillDown] = useState(false);
@@ -186,7 +233,7 @@ export default function InsightsDashboard() {
   // Auto-refresh every 15 minutes (ONLY after initial fetch)
   useEffect(() => {
     if (!initialFetchRef.current) return; // Don't auto-refresh until user clicks Get Insights
-    
+
     const interval = setInterval(() => {
       console.log('🔄 15-minute auto-refresh triggered');
       refreshData();
@@ -203,11 +250,11 @@ export default function InsightsDashboard() {
   // User must click "Get Insights" button to fetch fresh data
   useEffect(() => {
     if (hasLoadedCacheRef.current) return;
-    
+
     // Load cached data immediately if available
     loadCachedData(false);
     hasLoadedCacheRef.current = true;
-    
+
     console.log('📊 Insights page loaded - NO AUTO FETCH - waiting for user to click Get Insights');
   }, []);
 
@@ -216,7 +263,7 @@ export default function InsightsDashboard() {
     if (!hasLoadedCacheRef.current) return;
     if (!initialFetchRef.current) return; // Only fetch after user clicked "Get Insights" once
     if (!dateFrom || !dateTo) return;
-    
+
     console.log('🔄 Filters changed after initial fetch - refreshing data...');
     fetchData();
   }, [selectedProject, dateFrom, dateTo]);
@@ -268,7 +315,7 @@ export default function InsightsDashboard() {
           console.error('Error parsing cached range:', error);
         }
       }
-      
+
       // Log cache staleness for debugging
       if (cachedLastRefresh && initialize) {
         const lastRefreshDate = new Date(cachedLastRefresh);
@@ -325,12 +372,12 @@ export default function InsightsDashboard() {
         detailedLength: data.projects?.detailed?.length,
         summaryTotal: data.projects?.summary?.total
       });
-      
+
       if (!data.success) {
         console.error('❌ Projects API returned success=false:', data.error);
         throw new Error(data.error || 'Projects API returned error');
       }
-      
+
       // Prefer detailed list; fall back to summary values if detailed missing
       let projectsList = data.projects?.detailed || [];
       if ((!projectsList || projectsList.length === 0) && data.projects?.summary?.values) {
@@ -398,6 +445,40 @@ export default function InsightsDashboard() {
     } catch (error) {
       console.error('Error fetching activities:', error);
       return [];
+    }
+  };
+
+  const fetchBlockers = async () => {
+    setBlockersLoading(true);
+    try {
+      const res = await fetch(getApiUrl('/api/jira/blockers'));
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) {
+        setBlockers({ blocked: data.data?.blocked_issues || [], flagged: data.data?.flagged_issues || [] });
+      }
+    } catch (e) {
+      console.error('Blockers fetch error:', e);
+    } finally {
+      setBlockersLoading(false);
+    }
+  };
+
+  const fetchPerformers = async (projectKey: string | null) => {
+    setPerformersLoading(true);
+    try {
+      const res = await fetch(getApiUrl('/api/jira/best-performers'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectKey }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) setPerformers(data.performers || []);
+    } catch (e) {
+      console.error('Performers fetch error:', e);
+    } finally {
+      setPerformersLoading(false);
     }
   };
 
@@ -501,6 +582,8 @@ export default function InsightsDashboard() {
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    setBlockers(null);
+    setPerformers([]);
 
     console.log('🔄 Starting data fetch...');
     console.log('📡 API URL:', getApiUrl('/api/jira/projects'));
@@ -526,6 +609,10 @@ export default function InsightsDashboard() {
         fetchActivities(),
         fetchEnhancedMetrics(projectFilter, dateFrom, dateTo)
       ]);
+
+      // Fire blockers + performers in parallel (non-blocking — don't await)
+      fetchBlockers();
+      fetchPerformers(projectFilter);
 
       console.log('✅ Data fetched successfully:', {
         projects: projectsData?.length || 0,
@@ -555,7 +642,7 @@ export default function InsightsDashboard() {
   const handleGetInsights = async () => {
     // Mark that user has clicked Get Insights - enables auto-refresh on filter changes
     initialFetchRef.current = true;
-    
+
     console.log('👆 User clicked Get Insights - loading data...');
     setLoading(true);
     await fetchData();
@@ -757,15 +844,15 @@ const avgIssuesPerMember = topAssignees.length > 0
   // Generate AI-powered insights
   const generateAIInsights = async () => {
     if (!jiraMetrics) return;
-    
+
     setIsGeneratingInsights(true);
-    
+
     try {
       // Simulate AI processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       const suggestions: AISuggestion[] = [];
-      
+
       // Analyze workload distribution
       if (jiraMetrics.issuesByAssignee) {
         const assignees = Object.entries(jiraMetrics.issuesByAssignee);
@@ -775,11 +862,11 @@ const avgIssuesPerMember = topAssignees.length > 0
           const maxWorkload = Math.max(...counts);
           const minWorkload = Math.min(...counts);
           const workloadDifference = maxWorkload - minWorkload;
-          
+
           if (workloadDifference > 5) {
             const overloadedPerson = assignees.find(([_, count]) => count === maxWorkload)?.[0];
             const underloadedPerson = assignees.find(([_, count]) => count === minWorkload)?.[0];
-            
+
             if (overloadedPerson && underloadedPerson) {
               suggestions.push({
                 component: 'workload',
@@ -791,14 +878,14 @@ const avgIssuesPerMember = topAssignees.length > 0
           }
         }
       }
-      
+
       // Analyze priority distribution
       if (jiraMetrics.issuesByPriority) {
         const priorities = Object.entries(jiraMetrics.issuesByPriority);
         const highPriority = priorities.find(([priority]) => priority.toLowerCase().includes('high'))?.[1] || 0;
         const totalIssues = jiraMetrics.totalIssues;
         const highPriorityPercentage = (highPriority / totalIssues) * 100;
-        
+
         if (highPriorityPercentage > 20) {
           suggestions.push({
             component: 'priority',
@@ -808,7 +895,7 @@ const avgIssuesPerMember = topAssignees.length > 0
           });
         }
       }
-      
+
       // Analyze completion rate
       const completionRate = (jiraMetrics.resolvedIssues / jiraMetrics.totalIssues) * 100;
       if (completionRate < 60) {
@@ -819,7 +906,7 @@ const avgIssuesPerMember = topAssignees.length > 0
           actionable: true
         });
       }
-      
+
       // Analyze average resolution time
       if (jiraMetrics.avgResolutionTime > 5) {
         suggestions.push({
@@ -829,7 +916,7 @@ const avgIssuesPerMember = topAssignees.length > 0
           actionable: true
         });
       }
-      
+
       // Analyze bug-to-story ratio
       const bugRatio = (jiraMetrics.bugs / jiraMetrics.stories) * 100;
       if (bugRatio > 30) {
@@ -840,7 +927,7 @@ const avgIssuesPerMember = topAssignees.length > 0
           actionable: true
         });
       }
-      
+
       setAiSuggestions(suggestions);
     } catch (error) {
       console.error('Failed to generate AI insights:', error);
@@ -865,7 +952,7 @@ const avgIssuesPerMember = topAssignees.length > 0
   // AI Tooltip Component
   const AITooltip = ({ component, children }: { component: string; children: React.ReactNode }) => {
     const suggestion = getAISuggestion(component);
-    
+
     if (!aiInsightsEnabled || !suggestion) {
       return <>{children}</>;
     }
@@ -881,18 +968,15 @@ const avgIssuesPerMember = topAssignees.length > 0
           >
             <Button
               size="sm"
-              className={`h-6 w-6 p-0 rounded-full shadow-lg ${
-                suggestion.priority === 'high' 
-                  ? 'bg-red-500 hover:bg-red-600' 
-                  : suggestion.priority === 'medium'
-                    ? 'bg-yellow-500 hover:bg-yellow-600'
-                    : 'bg-green-500 hover:bg-green-600'
-              }`}
+              className="h-6 w-6 p-0 rounded-full"
+              style={{
+                backgroundColor: suggestion.priority === 'high' ? 'var(--red)' : suggestion.priority === 'medium' ? 'var(--amber)' : 'var(--accent-cool)',
+              }}
               onClick={() => setActiveTooltip(activeTooltip === component ? null : component)}
             >
-              <Lightbulb className="h-3 w-3 text-white" />
+              <Lightbulb className="h-3 w-3" style={{ color: 'var(--bg-page)' }} />
             </Button>
-            
+
             {activeTooltip === component && (
               <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.9 }}
@@ -900,12 +984,12 @@ const avgIssuesPerMember = topAssignees.length > 0
                 exit={{ opacity: 0, y: 10, scale: 0.9 }}
                 className="absolute top-8 right-0 w-80 p-4 rounded-xl shadow-2xl border-2 z-50"
                 style={{
-                  backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-                  borderColor: suggestion.priority === 'high' 
-                    ? '#ef4444' 
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: suggestion.priority === 'high'
+                    ? 'var(--red)'
                     : suggestion.priority === 'medium'
-                      ? '#eab308'
-                      : '#22c55e'
+                      ? 'var(--amber)'
+                      : 'var(--accent-cool)'
                 }}
               >
                 <div className="flex items-start space-x-3">
@@ -913,15 +997,15 @@ const avgIssuesPerMember = topAssignees.length > 0
                     className="p-2 rounded-lg"
                     style={{
                       color: suggestion.priority === 'high'
-                        ? currentTheme.colors.error
+                        ? 'var(--red)'
                         : suggestion.priority === 'medium'
-                          ? currentTheme.colors.warning
-                          : currentTheme.colors.success,
+                          ? 'var(--amber)'
+                          : 'var(--accent-cool)',
                       backgroundColor: suggestion.priority === 'high'
-                        ? applyAlpha(currentTheme.colors.error, isDarkMode ? 0.25 : 0.15)
+                        ? applyAlpha('var(--red)', isDarkMode ? 0.25 : 0.15)
                         : suggestion.priority === 'medium'
-                          ? applyAlpha(currentTheme.colors.warning, isDarkMode ? 0.25 : 0.15)
-                          : applyAlpha(currentTheme.colors.success, isDarkMode ? 0.25 : 0.15)
+                          ? applyAlpha('var(--amber)', isDarkMode ? 0.25 : 0.15)
+                          : applyAlpha('var(--accent-cool)', isDarkMode ? 0.25 : 0.15)
                     }}
                   >
                     <Brain className="h-4 w-4" style={{ color: 'inherit' }} />
@@ -932,15 +1016,15 @@ const avgIssuesPerMember = topAssignees.length > 0
                         className="text-xs font-bold px-2 py-1 rounded-full"
                         style={{
                           color: suggestion.priority === 'high'
-                            ? currentTheme.colors.error
+                            ? 'var(--red)'
                             : suggestion.priority === 'medium'
-                              ? currentTheme.colors.warning
-                              : currentTheme.colors.success,
+                              ? 'var(--amber)'
+                              : 'var(--accent-cool)',
                           backgroundColor: suggestion.priority === 'high'
-                            ? applyAlpha(currentTheme.colors.error, isDarkMode ? 0.3 : 0.18)
+                            ? applyAlpha('var(--red)', isDarkMode ? 0.3 : 0.18)
                             : suggestion.priority === 'medium'
-                              ? applyAlpha(currentTheme.colors.warning, isDarkMode ? 0.3 : 0.18)
-                              : applyAlpha(currentTheme.colors.success, isDarkMode ? 0.3 : 0.18)
+                              ? applyAlpha('var(--amber)', isDarkMode ? 0.3 : 0.18)
+                              : applyAlpha('var(--accent-cool)', isDarkMode ? 0.3 : 0.18)
                         }}
                       >
                         {suggestion.priority.toUpperCase()} PRIORITY
@@ -949,24 +1033,22 @@ const avgIssuesPerMember = topAssignees.length > 0
                         <span
                           className="text-xs font-medium px-2 py-1 rounded-full"
                           style={{
-                            color: currentTheme.colors.info,
-                            backgroundColor: applyAlpha(currentTheme.colors.info, isDarkMode ? 0.25 : 0.15)
+                            color: 'var(--accent-cool)',
+                            backgroundColor: applyAlpha('var(--accent-cool)', isDarkMode ? 0.25 : 0.15)
                           }}
                         >
                           ACTIONABLE
                         </span>
                       )}
                     </div>
-                    <p className={`text-sm leading-relaxed ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                       {suggestion.suggestion}
                     </p>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">AI Insight</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>AI Insight</span>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -990,1561 +1072,1014 @@ const avgIssuesPerMember = topAssignees.length > 0
     return <LoadingSkeleton />;
   }
 
+  // ─── Shared input style helper ────────────────────────────────────────────
+  const inputStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    fontWeight: 500,
+    width: '100%',
+    cursor: 'pointer',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--text-muted)',
+    marginBottom: 4,
+    display: 'block',
+  };
+
+  // ─── Chart data helpers ───────────────────────────────────────────────────
+  const velocityChartData = enhancedMetrics?.sprintVelocityTrends?.map(item => ({
+    sprint: item.sprintName,
+    velocity: item.velocity,
+    committed: item.committedPoints,
+    completed: item.completedPoints,
+  })) || [];
+
+  const burndownChartData = enhancedMetrics?.burndownData?.[0]?.dates?.map((date, index) => ({
+    date,
+    ideal: enhancedMetrics.burndownData[0].idealBurndown[index],
+    actual: enhancedMetrics.burndownData[0].actualBurndown[index],
+    remaining: enhancedMetrics.burndownData[0].remainingWork[index],
+  })) || [];
+
+  const capacityChartData = enhancedMetrics?.teamCapacity?.map(item => ({
+    assignee: item.assignee.split(' ')[0],
+    utilization: item.utilizationPercentage,
+  })) || [];
+
+  const historicalChartData = enhancedMetrics?.monthlyTrends?.months?.map((month, index) => ({
+    month,
+    issues: enhancedMetrics.monthlyTrends.issues[index],
+    velocity: enhancedMetrics.monthlyTrends.velocity[index],
+    completion: enhancedMetrics.monthlyTrends.completionRate[index],
+  })) || [];
+
+  // ─── Issue type total ─────────────────────────────────────────────────────
+  const issueTypeTotal = (jiraMetrics?.bugs || 0) + (jiraMetrics?.stories || 0) + (jiraMetrics?.tasks || 0) + (jiraMetrics?.epics || 0);
+  const issueTypes = [
+    { label: 'Bugs',    value: jiraMetrics?.bugs || 0,    color: 'var(--red)',         pct: issueTypeTotal > 0 ? Math.round(((jiraMetrics?.bugs || 0) / issueTypeTotal) * 100) : 0 },
+    { label: 'Stories', value: jiraMetrics?.stories || 0, color: 'var(--accent-cool)', pct: issueTypeTotal > 0 ? Math.round(((jiraMetrics?.stories || 0) / issueTypeTotal) * 100) : 0 },
+    { label: 'Tasks',   value: jiraMetrics?.tasks || 0,   color: 'var(--green)',        pct: issueTypeTotal > 0 ? Math.round(((jiraMetrics?.tasks || 0) / issueTypeTotal) * 100) : 0 },
+    { label: 'Epics',   value: jiraMetrics?.epics || 0,   color: 'var(--amber)',        pct: issueTypeTotal > 0 ? Math.round(((jiraMetrics?.epics || 0) / issueTypeTotal) * 100) : 0 },
+  ];
+
+  // ─── 6 KPI summary stats ──────────────────────────────────────────────────
+  const kpiCards = [
+    { label: 'Total Issues',    value: jiraMetrics?.totalIssues ?? '—',    color: 'var(--accent-cool)', bar: jiraMetrics ? 80 : 0 },
+    { label: 'Open Issues',     value: jiraMetrics?.openIssues ?? '—',     color: 'var(--amber)',        bar: jiraMetrics && jiraMetrics.totalIssues > 0 ? Math.round((jiraMetrics.openIssues / jiraMetrics.totalIssues) * 100) : 0 },
+    { label: 'Resolved',        value: jiraMetrics?.resolvedIssues ?? '—', color: 'var(--green)',        bar: getCompletionRate() },
+    { label: 'Bugs',            value: jiraMetrics?.bugs ?? '—',           color: 'var(--red)',          bar: jiraMetrics && jiraMetrics.totalIssues > 0 ? Math.round(((jiraMetrics.bugs || 0) / jiraMetrics.totalIssues) * 100) : 0 },
+    { label: 'Stories',         value: jiraMetrics?.stories ?? '—',        color: 'var(--accent-cool)', bar: jiraMetrics && jiraMetrics.totalIssues > 0 ? Math.round(((jiraMetrics.stories || 0) / jiraMetrics.totalIssues) * 100) : 0 },
+    { label: 'Story Points',    value: jiraMetrics?.storyPoints ?? '—',    color: 'var(--text-primary)', bar: 60 },
+  ];
+
+  // ─── Section title style ──────────────────────────────────────────────────
+  const sectionTitle = (label: string, icon: React.ReactNode) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--accent-cool)15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {icon}
+      </div>
+      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{label}</span>
+    </div>
+  );
+
+  // ─── Divider ──────────────────────────────────────────────────────────────
+  const divider = <div style={{ height: 1, background: 'var(--border)', margin: '0 0 28px' }} />;
+
   return (
-    <div 
-      id="insights-dashboard" 
-      className={`h-full overflow-auto transition-all duration-300 ${
-        isDarkMode ? 'bg-gray-900' : 'bg-white'
-      }`}
-    >
-      <div className="p-6 space-y-8">
-        {/* Header with Glassmorphism */}
-        <motion.div 
-          className="flex items-center justify-between"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="space-y-2">
-            <motion.h1 
-           key={`dashboard-title-${currentTheme.name}-${isDarkMode}`}
-           className="text-4xl font-bold tracking-tight transition-colors duration-300"
-              style={{
-                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-             color: currentTheme.colors.primary,
-             background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`,
-             WebkitBackgroundClip: 'text',
-             WebkitTextFillColor: 'transparent',
-             backgroundClip: 'text',
-             textRendering: 'optimizeLegibility',
-             WebkitFontSmoothing: 'antialiased',
-             MozOsxFontSmoothing: 'grayscale',
-                textShadow: '0 4px 8px rgba(0,0,0,0.1)'
-              }}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              Analytics Dashboard
-            </motion.h1>
-            <motion.p 
-           className={`text-xl font-medium tracking-wide transition-colors duration-300 ${
-             isDarkMode ? 'text-gray-300' : 'text-gray-700'
-           }`}
-              style={{ 
-                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              Real-time insights from your Jira workspace
-            </motion.p>
-            <motion.div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-medium transition-colors duration-300 ${
-                isDarkMode ? 'bg-gray-800/70 text-gray-100' : 'bg-white/80 text-gray-700'
-              }`}
-              style={{
-                border: `1px solid ${currentTheme.colors.primary}30`,
-                boxShadow: `0 10px 20px ${currentTheme.colors.primary}10`
-              }}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <span className="uppercase tracking-wide text-xs" style={{ color: currentTheme.colors.primary }}>
-                Date Range
-              </span>
-              <span>{dateRangeLabel}</span>
-              {typeof issuesInRange === 'number' && (
-                <span className="text-xs opacity-70">• {issuesInRange} issues</span>
-              )}
-            </motion.div>
-          </div>
-          <motion.div 
-            className="flex items-center space-x-4"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="relative">
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger 
-                  className={`w-56 backdrop-blur-xl border-2 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl font-semibold ${
-                    isDarkMode
-                      ? 'bg-gray-800/90 border-gray-600/50 text-white'
-                      : 'bg-white/90 border-gray-300/50 text-black'
-                  }`}
-                >
-                  <SelectValue placeholder="Select Project" />
-                </SelectTrigger>
-                <SelectContent 
-                  className={`backdrop-blur-xl border-2 shadow-2xl rounded-2xl transition-colors duration-300 ${
-                    isDarkMode
-                      ? 'bg-gray-800/95 border-gray-600/50'
-                      : 'bg-white/95 border-gray-300/50'
-                  } max-h-80 overflow-y-auto`}
-                >
-                  <SelectItem 
-                    value="ALL" 
-                    className={`font-medium rounded-xl mx-2 my-1 transition-colors duration-300 ${
-                      isDarkMode
-                        ? 'text-gray-100 hover:bg-gray-700 hover:text-white'
-                        : 'text-gray-900 hover:bg-gray-50 hover:text-black'
-                    }`}
-                  >
-                    All Projects
-                  </SelectItem>
-                  {Array.isArray(projects) && projects
-                    .map((project) => (
-                    <SelectItem 
-                      key={project.id} 
-                      value={project.key} 
-                      className={`font-medium rounded-xl mx-2 my-1 transition-colors duration-300 ${
-                        isDarkMode
-                          ? 'text-gray-100 hover:bg-gray-700 hover:text-white'
-                          : 'text-gray-900 hover:bg-gray-50 hover:text-black'
-                      }`}
-                    >
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <DashboardLayout>
+      <div
+        id="insights-dashboard"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '28px 28px 48px',
+        }}
+      >
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+
+          {/* ── HEADER ──────────────────────────────────────────────────── */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+            <div>
+              <p style={{ color: 'var(--accent-cool)', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 6px' }}>
+                Jira Integration
+              </p>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: '0 0 4px' }}>
+                Jira Insights
+              </h1>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+                Real-time project intelligence for engineering leaders
+              </p>
             </div>
-            <div
-              className={`flex items-center gap-4 px-4 py-2 rounded-2xl border transition-colors duration-300 ${
-                isDarkMode ? 'bg-gray-800/70 border-gray-700 text-gray-100' : 'bg-white/80 border-gray-200 text-gray-700'
-              }`}
-            >
-              <div className="flex flex-col text-xs font-semibold uppercase tracking-wide">
-                <span>From</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo}
-                  onChange={(e) => handleDateFromChange(e.target.value)}
-                  className={`mt-1 bg-transparent border-none focus:outline-none focus:ring-0 ${
-                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                  }`}
-                />
-              </div>
-              <div className="flex flex-col text-xs font-semibold uppercase tracking-wide">
-                <span>To</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom}
-                  onChange={(e) => handleDateToChange(e.target.value)}
-                  className={`mt-1 bg-transparent border-none focus:outline-none focus:ring-0 ${
-                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                  }`}
-                />
-              </div>
-            </div>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button 
-                onClick={handleGetInsights} 
-                disabled={loading}
-                className="text-white shadow-xl border-0 rounded-2xl font-semibold px-6 py-3 hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {/* AI toggle */}
+              <button
+                onClick={toggleAIInsights}
+                disabled={isGeneratingInsights || !jiraMetrics}
                 style={{
-                  backgroundColor: currentTheme.colors.primary,
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: aiInsightsEnabled ? 'var(--accent-cool)18' : 'var(--bg-card)',
+                  border: `1px solid ${aiInsightsEnabled ? 'var(--accent-cool)' : 'var(--border)'}`,
+                  borderRadius: 10, padding: '7px 14px', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600,
+                  color: aiInsightsEnabled ? 'var(--accent-cool)' : 'var(--text-secondary)',
+                  transition: 'all 0.15s',
+                  opacity: (!jiraMetrics || isGeneratingInsights) ? 0.5 : 1,
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = currentTheme.colors.secondary;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = currentTheme.colors.primary;
-                }}
-                size="sm"
               >
-                <motion.div
-                  animate={loading ? { rotate: 360 } : { rotate: 0 }}
-                  transition={{ duration: 1, repeat: loading ? Infinity : 0 }}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                </motion.div>
-                Refresh Data
-              </Button>
-            </motion.div>
-            
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button 
+                <Brain size={13} />
+                {isGeneratingInsights ? 'Analyzing…' : 'AI Insights'}
+              </button>
+
+              {/* Refresh */}
+              <button
+                onClick={refreshData}
+                disabled={isRefreshing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '7px 14px', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+                  opacity: isRefreshing ? 0.6 : 1, transition: 'opacity 0.15s',
+                }}
+              >
+                <RefreshCw size={13} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+                Refresh
+              </button>
+
+              {/* Export PDF */}
+              <button
                 onClick={handleExportPDF}
-                className="text-white shadow-xl border-0 rounded-2xl font-semibold px-6 py-3 hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
                 style={{
-                  backgroundColor: currentTheme.colors.accent,
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '7px 14px', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = currentTheme.colors.primary;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = currentTheme.colors.accent;
-                }}
-                size="sm"
               >
-                <FileText className="h-4 w-4 mr-2" />
+                <FileText size={13} />
                 Export PDF
-              </Button>
-            </motion.div>
+              </button>
 
-          </motion.div>
-        </motion.div>
-
-        {/* Error Alert with Animation */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Alert variant="destructive" className="bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-red-200 dark:border-red-800">
-                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertDescription className="text-red-800 dark:text-red-200">
-                  {error}. Using cached data if available.
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Last Refresh with Animation */}
-        <motion.div 
-          className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          <Sparkles className="h-4 w-4" />
-          <span>Last updated: {lastRefresh.toLocaleString()}</span>
-        </motion.div>
-
-        {/* Key Metrics Grid with Modern Cards */}
-        <motion.div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.6 }}
-        >
-          {/* Total Issues - Professional Animation */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            transition={{ 
-              duration: 0.2,
-              ease: "easeOut"
-            }}
-          >
-            <Card 
-              className={`shadow-xl hover:shadow-2xl transition-all duration-500 rounded-3xl border backdrop-blur-sm relative overflow-hidden ${
-                isDarkMode 
-                  ? 'bg-gray-800/95 border-gray-700/60' 
-                  : 'bg-white/98 border-gray-200/60'
-              }`}
-              style={{
-                boxShadow: `0 25px 50px ${currentTheme.colors.primary}20, 0 0 0 1px ${currentTheme.colors.primary}10`
-              }}
-            >
-              {/* Theme-colored background effect */}
-              <div 
-                className="absolute inset-0 opacity-15 transition-opacity duration-300"
+              {/* Export CSV */}
+              <button
+                onClick={() => { setExportFormat('csv'); setTimeout(() => handleEnhancedExport(), 0); }}
                 style={{
-                  background: `linear-gradient(135deg, ${currentTheme.colors.primary}25, ${currentTheme.colors.secondary}25)`
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '7px 14px', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
                 }}
-              ></div>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                <CardTitle 
-                 className={`text-sm font-bold tracking-wide transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                 }`}
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  Total Issues
-                </CardTitle>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <BarChart3 
-                    className="h-6 w-6" 
-                    style={{ color: currentTheme.colors.primary }}
-                  />
-                </motion.div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <motion.div 
-                 className={`text-4xl font-black tracking-tight transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                 }`}
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 1.2, type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  {jiraMetrics?.totalIssues || 0}
-                </motion.div>
-                <p 
-                  className="text-xs mt-2 flex items-center font-medium"
-                  style={{ 
-                    color: currentTheme.colors.textSecondary,
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  <Zap className="h-3 w-3 mr-1" />
-                  Across all projects
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+              >
+                <Download size={13} />
+                Export CSV
+              </button>
+            </div>
+          </div>
 
-          {/* Completion Rate - Professional Animation */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            transition={{ 
-              duration: 0.2,
-              ease: "easeOut"
-            }}
-          >
-            <Card className={`shadow-xl hover:shadow-2xl transition-all duration-500 rounded-3xl border backdrop-blur-sm relative overflow-hidden ${
-              isDarkMode 
-                ? 'bg-gray-800/95 border-gray-700/60' 
-                : 'bg-white/98 border-gray-200/60'
-            }`}
-            style={{
-              boxShadow: `0 25px 50px ${currentTheme.colors.success}20, 0 0 0 1px ${currentTheme.colors.success}10`
-            }}>
-              {/* Theme-colored background effect */}
-              <div 
-                className="absolute inset-0 opacity-15 transition-opacity duration-300"
+          {/* ── ERROR BANNER ─────────────────────────────────────────────── */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
                 style={{
-                  background: `linear-gradient(135deg, ${currentTheme.colors.success}25, ${currentTheme.colors.accent}25)`
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                  background: 'var(--red)12', border: '1px solid var(--red)40',
+                  borderRadius: 12, padding: '14px 18px', marginBottom: 20,
                 }}
-              ></div>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                <CardTitle                  className={`text-sm font-bold tracking-wide transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                 }`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Completion Rate</CardTitle>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <CheckCircle 
-                    className="h-6 w-6" 
-                    style={{ color: currentTheme.colors.success }}
-                  />
-                </motion.div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <motion.div 
-                  className="text-4xl font-black tracking-tight transition-colors duration-300"
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    color: currentTheme.colors.success,
-                    background: `linear-gradient(90deg, ${currentTheme.colors.success}, ${currentTheme.colors.accent})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text'
-                  }}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 1.4, type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  {getCompletionRate()}%
-                </motion.div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center font-medium" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  {jiraMetrics?.resolvedIssues || 0} of {jiraMetrics?.totalIssues || 0} resolved
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Story Points - Professional Animation */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            transition={{ 
-              duration: 0.2,
-              ease: "easeOut"
-            }}
-          >
-            <Card 
-              className={`shadow-lg hover:shadow-xl transition-all duration-500 rounded-2xl border relative overflow-hidden ${
-                isDarkMode 
-                  ? 'bg-gray-800/95 border-gray-700/60' 
-                  : 'bg-white/98 border-gray-200/60'
-              }`}
-              style={{
-                boxShadow: `0 20px 40px ${currentTheme.colors.secondary}20, 0 0 0 1px ${currentTheme.colors.secondary}10`
-              }}
-            >
-              {/* Theme-colored background effect */}
-              <div 
-                className="absolute inset-0 opacity-15 transition-opacity duration-300"
-                style={{
-                  background: `linear-gradient(135deg, ${currentTheme.colors.secondary}25, ${currentTheme.colors.accent}25)`
-                }}
-              ></div>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                <CardTitle 
-                 className={`text-sm font-bold tracking-wide transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                 }`}
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  Story Points
-                </CardTitle>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <Target 
-                    className="h-6 w-6" 
-                    style={{ color: currentTheme.colors.secondary }}
-                  />
-                </motion.div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <motion.div 
-                  className="text-4xl font-black tracking-tight transition-colors duration-300"
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    color: currentTheme.colors.secondary,
-                    background: `linear-gradient(90deg, ${currentTheme.colors.secondary}, ${currentTheme.colors.accent})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text'
-                  }}
-                  initial={{ scale: 0, rotate: 180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  {jiraMetrics?.storyPoints || 0}
-                </motion.div>
-                <p 
-                  className="text-xs mt-2 flex items-center font-medium"
-                  style={{ 
-                    color: currentTheme.colors.textSecondary,
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  Sprint velocity: {jiraMetrics?.sprintVelocity || 0}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Avg Resolution Time - Professional Animation */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            transition={{ 
-              duration: 0.2,
-              ease: "easeOut"
-            }}
-          >
-            <Card 
-              className={`shadow-lg hover:shadow-xl transition-all duration-500 rounded-2xl border relative overflow-hidden ${
-                isDarkMode 
-                  ? 'bg-gray-800/95 border-gray-700/60' 
-                  : 'bg-white/98 border-gray-200/60'
-              }`}
-              style={{
-                boxShadow: `0 20px 40px ${currentTheme.colors.warning}20, 0 0 0 1px ${currentTheme.colors.warning}10`
-              }}
-            >
-              {/* Theme-colored background effect */}
-              <div 
-                className="absolute inset-0 opacity-15 transition-opacity duration-300"
-                style={{
-                  background: `linear-gradient(135deg, ${currentTheme.colors.warning}25, ${currentTheme.colors.accent}25)`
-                }}
-              ></div>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                <CardTitle 
-                 className={`text-sm font-bold tracking-wide transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                 }`}
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  Avg Resolution
-                </CardTitle>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <Clock 
-                    className="h-6 w-6" 
-                    style={{ color: currentTheme.colors.warning }}
-                  />
-                </motion.div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <motion.div 
-                  className="text-4xl font-black tracking-tight transition-colors duration-300"
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    color: currentTheme.colors.warning,
-                    background: `linear-gradient(90deg, ${currentTheme.colors.warning}, ${currentTheme.colors.accent})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text'
-                  }}
-                  initial={{ scale: 0, rotate: -90 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 1.8, type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  {jiraMetrics?.avgResolutionTime || 0}d
-                </motion.div>
-                <p 
-                  className="text-xs mt-2 flex items-center font-medium"
-                  style={{ 
-                    color: currentTheme.colors.textSecondary,
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  <Activity className="h-3 w-3 mr-1" />
-                  Days to resolve
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
-
-        {/* Issue Type Breakdown with Modern Cards */}
-        <motion.div 
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 2, duration: 0.6 }}
-        >
-          <motion.div
-            whileHover={{ scale: 1.01, rotate: 0.5 }}
-            animate={{ 
-              y: [0, -2, 0],
-              rotate: [0, 0.5, -0.5, 0]
-            }}
-            transition={{ 
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
-            <Card 
-              className={`shadow-lg hover:shadow-xl transition-all duration-500 rounded-2xl border ${
-                isDarkMode 
-                  ? 'bg-gray-800 border-gray-700' 
-                  : 'bg-white border-gray-200'
-              }`}
-            >
-              <CardHeader>
-                <CardTitle 
-                 key={`issue-types-${currentTheme.name}-${isDarkMode}`}
-                 className="flex items-center text-lg font-semibold tracking-wide transition-colors duration-300"
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    color: currentTheme.colors.primary,
-                    background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    textRendering: 'optimizeLegibility',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale'
-                  }}
-                >
-                  <PieChart 
-                    className="h-5 w-5 mr-3" 
-                    style={{ color: currentTheme.colors.primary }}
-                  />
-                  Issue Types
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center space-y-6">
-                  {/* Circular Progress Chart */}
-                  <div className="relative w-48 h-48">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      {/* Background Circle */}
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        className="text-gray-200 dark:text-gray-700"
-                      />
-                      {/* Tasks Arc */}
-                      <motion.circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke={currentTheme.colors.primary}
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${(jiraMetrics?.tasks || 0) * 2.51} 251`}
-                        initial={{ strokeDasharray: "0 251" }}
-                        animate={{ strokeDasharray: `${(jiraMetrics?.tasks || 0) * 2.51} 251` }}
-                        transition={{ delay: 2.2, duration: 1.5, ease: "easeOut" }}
-                      />
-                      {/* Stories Arc */}
-                      <motion.circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke={currentTheme.colors.secondary}
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${(jiraMetrics?.stories || 0) * 2.51} 251`}
-                        strokeDashoffset={`-${(jiraMetrics?.tasks || 0) * 2.51}`}
-                        initial={{ strokeDasharray: "0 251" }}
-                        animate={{ strokeDasharray: `${(jiraMetrics?.stories || 0) * 2.51} 251` }}
-                        transition={{ delay: 2.4, duration: 1.5, ease: "easeOut" }}
-                      />
-                      {/* Bugs Arc */}
-                      <motion.circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke={currentTheme.colors.error}
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${(jiraMetrics?.bugs || 0) * 2.51} 251`}
-                        strokeDashoffset={`-${((jiraMetrics?.tasks || 0) + (jiraMetrics?.stories || 0)) * 2.51}`}
-                        initial={{ strokeDasharray: "0 251" }}
-                        animate={{ strokeDasharray: `${(jiraMetrics?.bugs || 0) * 2.51} 251` }}
-                        transition={{ delay: 2.6, duration: 1.5, ease: "easeOut" }}
-                      />
-                      {/* Epics Arc */}
-                      <motion.circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke={currentTheme.colors.warning}
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${(jiraMetrics?.epics || 0) * 2.51} 251`}
-                        strokeDashoffset={`-${((jiraMetrics?.tasks || 0) + (jiraMetrics?.stories || 0) + (jiraMetrics?.bugs || 0)) * 2.51}`}
-                        initial={{ strokeDasharray: "0 251" }}
-                        animate={{ strokeDasharray: `${(jiraMetrics?.epics || 0) * 2.51} 251` }}
-                        transition={{ delay: 2.8, duration: 1.5, ease: "easeOut" }}
-                      />
-                    </svg>
-                    {/* Center Total */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.div 
-                        className="text-center"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 3, type: "spring", stiffness: 200 }}
-                      >
-                        <div className="text-2xl font-black text-gray-800 dark:text-gray-200" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                          {((jiraMetrics?.tasks || 0) + (jiraMetrics?.stories || 0) + (jiraMetrics?.bugs || 0) + (jiraMetrics?.epics || 0))}
-                    </div>
-                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                          Total
-                        </div>
-                      </motion.div>
-                    </div>
-                  </div>
-                  
-                  {/* Legend */}
-                  <div className="grid grid-cols-2 gap-3 w-full">
-                    <motion.div 
-                      className={`flex items-center space-x-2 p-2 rounded-xl transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 3.2 }}
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: currentTheme.colors.primary }}
-                      ></div>
-                      <span className={`text-xs font-semibold transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Tasks</span>
-                      <span 
-                        className="text-xs font-bold ml-auto" 
-                        style={{ 
-                          color: currentTheme.colors.primary,
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
-                        }}
-                      >{jiraMetrics?.tasks || 0}</span>
-                  </motion.div>
-                  <motion.div 
-                      className={`flex items-center space-x-2 p-2 rounded-xl transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 3.4 }}
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: currentTheme.colors.secondary }}
-                      ></div>
-                      <span className={`text-xs font-semibold transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Stories</span>
-                      <span 
-                        className="text-xs font-bold ml-auto" 
-                        style={{ 
-                          color: currentTheme.colors.secondary,
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
-                        }}
-                      >{jiraMetrics?.stories || 0}</span>
-                  </motion.div>
-                  <motion.div 
-                      className={`flex items-center space-x-2 p-2 rounded-xl transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 3.6 }}
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: currentTheme.colors.error }}
-                      ></div>
-                      <span className={`text-xs font-semibold transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Bugs</span>
-                      <span 
-                        className="text-xs font-bold ml-auto" 
-                        style={{ 
-                          color: currentTheme.colors.error,
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
-                        }}
-                      >{jiraMetrics?.bugs || 0}</span>
-                  </motion.div>
-                  <motion.div 
-                      className={`flex items-center space-x-2 p-2 rounded-xl transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 3.8 }}
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: currentTheme.colors.warning }}
-                      ></div>
-                      <span className={`text-xs font-semibold transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Epics</span>
-                      <span 
-                        className="text-xs font-bold ml-auto" 
-                        style={{ 
-                          color: currentTheme.colors.warning,
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
-                        }}
-                      >{jiraMetrics?.epics || 0}</span>
-                  </motion.div>
-                  </div>
+              >
+                <AlertTriangle size={16} style={{ color: 'var(--red)', flexShrink: 0, marginTop: 1 }} />
+                <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+                  {error} — using cached data where available.
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+                  <X size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Status Distribution - Slide Animation */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            transition={{ 
-              duration: 0.2,
-              ease: "easeOut"
-            }}
-          >
-            <Card className={`shadow-xl hover:shadow-2xl transition-all duration-500 rounded-3xl border backdrop-blur-sm ${
-              isDarkMode 
-                ? 'bg-gray-800/90 border-gray-700/50' 
-                : 'bg-white/95 border-gray-200/50'
-            }`}>
-              <CardHeader>
-                <CardTitle 
-                  key={`status-distribution-${currentTheme.name}-${isDarkMode}`}
-                  className="flex items-center text-lg font-semibold tracking-wide transition-colors duration-300"
-                  style={{ 
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    color: currentTheme.colors.primary,
-                    background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    textRendering: 'optimizeLegibility',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale'
-                  }}
-                >
-                  <Activity 
-                    className="h-5 w-5 mr-3" 
-                    style={{ color: currentTheme.colors.primary }}
+          {/* ── FILTER BAR ───────────────────────────────────────────────── */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 20px', marginBottom: 28 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 180px auto', gap: 16, alignItems: 'end' }}>
+              {/* Project dropdown */}
+              <div>
+                <span style={labelStyle}>Project</span>
+                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                  <SelectTrigger
+                    style={{
+                      background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                      borderRadius: 10, color: 'var(--text-primary)', fontSize: 13,
+                      fontWeight: 500, height: 36, paddingLeft: 12,
+                    }}
+                  >
+                    <SelectValue placeholder="All Projects" />
+                  </SelectTrigger>
+                  <SelectContent style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                    <SelectItem value="ALL" style={{ color: 'var(--text-primary)', fontSize: 13 }}>All Projects</SelectItem>
+                    {Array.isArray(projects) && projects.map(p => (
+                      <SelectItem key={p.id} value={p.key} style={{ color: 'var(--text-primary)', fontSize: 13 }}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date from */}
+              <div>
+                <span style={labelStyle}>From</span>
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, height: 36 }}>
+                  <Calendar size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo}
+                    onChange={e => handleDateFromChange(e.target.value)}
+                    style={inputStyle}
                   />
-                  Status Distribution
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* Timeline Design */}
-                  <div className="relative">
-                    {/* Timeline Line */}
-                    <div 
-                      className="absolute left-6 top-0 bottom-0 w-0.5 transition-colors duration-300"
-                      style={{
-                        background: `linear-gradient(to bottom, ${currentTheme.colors.success}, ${currentTheme.colors.info}, ${currentTheme.colors.warning})`
-                      }}
-                    ></div>
-                    
-                  {statusDistribution.map(([status, count], index) => {
-                      const statusConfig = {
-                        'Done': { 
-                          color: currentTheme.colors.success, 
-                          bg: currentTheme.colors.success, 
-                          text: currentTheme.colors.success, 
-                          icon: '✓' 
-                        },
-                        'In Progress': { 
-                          color: currentTheme.colors.info, 
-                          bg: currentTheme.colors.info, 
-                          text: currentTheme.colors.info, 
-                          icon: '⚡' 
-                        },
-                        'To Do': { 
-                          color: currentTheme.colors.warning, 
-                          bg: currentTheme.colors.warning, 
-                          text: currentTheme.colors.warning, 
-                          icon: '📋' 
-                        },
-                        'default': { 
-                          color: currentTheme.colors.textSecondary, 
-                          bg: currentTheme.colors.textSecondary, 
-                          text: currentTheme.colors.textSecondary, 
-                          icon: '⏳' 
-                        }
-                      };
-                      const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.default;
-                      
-                      return (
-                     <motion.div 
-                       key={status} 
-                          className="relative flex items-center space-x-4 py-4"
-                          initial={{ opacity: 0, x: -30 }}
-                       animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 2.2 + index * 0.2, type: "spring", stiffness: 300 }}
-                        >
-                          {/* Timeline Dot */}
-                          <div 
-                            className="relative z-10 w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-lg transition-colors duration-300"
-                            style={{ backgroundColor: config.bg }}
-                          >
-                            {config.icon}
+                </div>
+              </div>
+
+              {/* Date to */}
+              <div>
+                <span style={labelStyle}>To</span>
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, height: 36 }}>
+                  <Calendar size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    onChange={e => handleDateToChange(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* Get Insights button */}
+              <button
+                onClick={handleGetInsights}
+                disabled={loading}
+                style={{
+                  background: 'var(--accent-cool)', color: '#000',
+                  border: 'none', borderRadius: 10, padding: '0 22px',
+                  fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+                  height: 36, display: 'flex', alignItems: 'center', gap: 7,
+                  opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s', whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {loading
+                  ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Zap size={13} />
+                }
+                {loading ? 'Loading…' : 'Get Insights'}
+              </button>
+            </div>
+
+            {/* Active filter pills */}
+            {jiraMetrics && (
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Showing:</span>
+                <span style={{ fontSize: 11, background: 'var(--accent-cool)18', color: 'var(--accent-cool)', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>
+                  {dateRangeLabel}
+                </span>
+                {issuesInRange !== null && (
+                  <span style={{ fontSize: 11, background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: 6, padding: '2px 8px' }}>
+                    {issuesInRange} issues
+                  </span>
+                )}
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                  Updated {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── LOADING INLINE ───────────────────────────────────────────── */}
+          {loading && jiraMetrics && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--accent-cool)10', border: '1px solid var(--accent-cool)30', borderRadius: 10, marginBottom: 24, fontSize: 13, color: 'var(--accent-cool)' }}>
+              <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              Refreshing data…
+            </div>
+          )}
+
+          {/* ── EMPTY STATE ──────────────────────────────────────────────── */}
+          {!jiraMetrics && !loading && (
+            <div style={{ textAlign: 'center', padding: '80px 24px' }}>
+              <div style={{ width: 64, height: 64, borderRadius: 20, background: 'var(--accent-cool)15', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                <BarChart3 size={28} style={{ color: 'var(--accent-cool)' }} />
+              </div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}>No Data Yet</h3>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: '0 0 28px', maxWidth: 360, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
+                Connect Jira and click "Get Insights" to load your team's project analytics.
+              </p>
+              <button
+                onClick={handleGetInsights}
+                style={{ background: 'var(--accent-cool)', color: '#000', border: 'none', borderRadius: 10, padding: '10px 28px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Get Insights
+              </button>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* DATA SECTIONS — only rendered when jiraMetrics is available   */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {jiraMetrics && (
+            <>
+              {/* ── AI SUGGESTIONS PANEL ──────────────────────────────── */}
+              <AnimatePresence>
+                {aiInsightsEnabled && aiSuggestions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    style={{ overflow: 'hidden', marginBottom: 28 }}
+                  >
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                        <Brain size={16} style={{ color: 'var(--accent-cool)' }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>AI Insights</span>
+                        <span style={{ fontSize: 11, background: 'var(--accent-cool)20', color: 'var(--accent-cool)', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>
+                          {aiSuggestions.length} suggestion{aiSuggestions.length !== 1 ? 's' : ''}
+                        </span>
                       </div>
-                          
-                          {/* Content */}
-                          <div className="flex-1 flex items-center justify-between">
-                            <div>
-                              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                                {status}
-                              </h3>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                                {count} issues
-                              </p>
-                            </div>
-                            
-                            {/* Progress Bar with enhanced effects */}
-                            <div 
-                              className="w-32 h-3 rounded-full overflow-hidden relative transition-colors duration-300"
-                              style={{ 
-                                backgroundColor: isDarkMode ? currentTheme.colors.surface : `${currentTheme.colors.border}40`,
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
-                              }}
-                            >
-                              <motion.div
-                                className="h-full rounded-full relative overflow-hidden"
-                                style={{ 
-                                  background: `linear-gradient(90deg, ${config.bg}, ${config.bg}dd, ${config.bg})`,
-                                  backgroundSize: '200% 100%',
-                                  boxShadow: `0 0 15px ${config.bg}50`
-                                }}
-                                initial={{ width: 0 }}
-                                animate={{ width: `${maxStatusCount > 0 ? (count / maxStatusCount) * 100 : 0}%` }}
-                                transition={{ delay: 2.4 + index * 0.2, duration: 1.5, ease: "easeOut" }}
-                              >
-                                {/* Shimmer effect */}
-                                <motion.div
-                                  className="absolute inset-0"
-                                  style={{
-                                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)'
-                                  }}
-                                  animate={{
-                                    x: ['-100%', '200%']
-                                  }}
-                                  transition={{
-                                    duration: 2,
-                                    repeat: Infinity,
-                                    ease: "linear",
-                                    repeatDelay: 1
-                                  }}
-                                />
-                              </motion.div>
-                            </div>
-                            
-                            {/* Count Badge */}
-                            <div className={`px-3 py-1 rounded-full ${config.bg} text-white text-sm font-bold`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                              {count}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {aiSuggestions.map((s, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              display: 'flex', alignItems: 'flex-start', gap: 12,
+                              background: s.priority === 'high' ? 'var(--red)08' : s.priority === 'medium' ? 'var(--amber)08' : 'var(--accent-cool)08',
+                              border: `1px solid ${s.priority === 'high' ? 'var(--red)30' : s.priority === 'medium' ? 'var(--amber)30' : 'var(--accent-cool)30'}`,
+                              borderRadius: 10, padding: '12px 14px',
+                            }}
+                          >
+                            <Lightbulb size={14} style={{ color: s.priority === 'high' ? 'var(--red)' : s.priority === 'medium' ? 'var(--amber)' : 'var(--accent-cool)', flexShrink: 0, marginTop: 1 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: s.priority === 'high' ? 'var(--red)' : s.priority === 'medium' ? 'var(--amber)' : 'var(--accent-cool)' }}>
+                                  {s.priority}
+                                </span>
+                                {s.actionable && <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>• actionable</span>}
+                              </div>
+                              <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{s.suggestion}</p>
                             </div>
                           </div>
-                    </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* ── KPI SUMMARY ROW ──────────────────────────────────────── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 28 }}>
+                {kpiCards.map((kpi, i) => (
+                  <div
+                    key={kpi.label}
+                    style={{
+                      background: 'var(--bg-card)', border: '1px solid var(--border)',
+                      borderRadius: 12, padding: '16px 14px',
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>
+                      {kpi.label}
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
+                      {kpi.value}
+                    </div>
+                    <div style={{ height: 3, background: 'var(--bg-surface)', borderRadius: 2, marginTop: 12, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(100, kpi.bar)}%`, background: kpi.color, borderRadius: 2, transition: 'width 0.8s ease' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── QUICK STATS ROW ──────────────────────────────────────── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
+                {/* Completion rate */}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--green)18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <CheckCircle size={20} style={{ color: 'var(--green)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>Completion Rate</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', letterSpacing: '-0.03em' }}>{getCompletionRate()}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{jiraMetrics.resolvedIssues} of {jiraMetrics.totalIssues} resolved</div>
+                  </div>
+                </div>
+
+                {/* Sprint velocity */}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent-cool)18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <TrendingUp size={20} style={{ color: 'var(--accent-cool)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>Sprint Velocity</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent-cool)', letterSpacing: '-0.03em' }}>{jiraMetrics.sprintVelocity || 0}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>pts · {jiraMetrics.storyPoints || 0} total story pts</div>
+                  </div>
+                </div>
+
+                {/* Avg resolution */}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--amber)18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Clock size={20} style={{ color: 'var(--amber)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>Avg Resolution</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--amber)', letterSpacing: '-0.03em' }}>{jiraMetrics.avgResolutionTime || 0}d</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>days to close</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CHARTS SECTION ───────────────────────────────────────── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, marginBottom: 28 }}>
+                {/* Main velocity / chart card */}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
+                  {/* Sprint Goal banner */}
+                  {enhancedMetrics?.latestSprintGoal && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'var(--accent-cool)10', border: '1px solid var(--accent-cool)30', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+                      <Target size={14} style={{ color: 'var(--accent-cool)', flexShrink: 0, marginTop: 1 }} />
+                      <div>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent-cool)', marginRight: 8 }}>Sprint Goal</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{enhancedMetrics.latestSprintGoal}</span>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                    {sectionTitle(
+                      selectedChartView === 'velocity' ? 'Sprint Velocity Trends'
+                        : selectedChartView === 'burndown' ? 'Burndown Chart'
+                        : selectedChartView === 'capacity' ? 'Team Capacity'
+                        : 'Historical Trends',
+                      <TrendingUp size={15} style={{ color: 'var(--accent-cool)' }} />
+                    )}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['velocity', 'burndown', 'capacity', 'historical'] as const).map(v => (
+                        <button
+                          key={v}
+                          onClick={() => setSelectedChartView(v)}
+                          style={{
+                            background: selectedChartView === v ? 'var(--accent-cool)' : 'var(--bg-surface)',
+                            color: selectedChartView === v ? '#000' : 'var(--text-secondary)',
+                            border: `1px solid ${selectedChartView === v ? 'var(--accent-cool)' : 'var(--border)'}`,
+                            borderRadius: 8, padding: '4px 11px', fontSize: 11, fontWeight: 600,
+                            cursor: 'pointer', textTransform: 'capitalize', letterSpacing: '0.03em',
+                          }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ height: 260 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      {selectedChartView === 'velocity' ? (
+                        <ComposedChart data={velocityChartData} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="sprint" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={30} />
+                          <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} />
+                          <Bar dataKey="committed" fill="var(--bg-surface)" radius={[4, 4, 0, 0]} />
+                          <Line type="monotone" dataKey="velocity" stroke="var(--accent-cool)" strokeWidth={2.5} dot={{ fill: 'var(--accent-cool)', r: 3 }} />
+                          <Line type="monotone" dataKey="completed" stroke="var(--green)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                        </ComposedChart>
+                      ) : selectedChartView === 'burndown' ? (
+                        <ComposedChart data={burndownChartData} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={30} />
+                          <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} />
+                          <Area type="monotone" dataKey="remaining" fill="var(--amber)" fillOpacity={0.12} stroke="none" />
+                          <Line type="monotone" dataKey="ideal" stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
+                          <Line type="monotone" dataKey="actual" stroke="var(--accent-cool)" strokeWidth={2.5} dot={{ fill: 'var(--accent-cool)', r: 3 }} />
+                        </ComposedChart>
+                      ) : selectedChartView === 'capacity' ? (
+                        <ComposedChart data={capacityChartData} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="assignee" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={36} unit="%" />
+                          <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} />
+                          <Bar dataKey="utilization" radius={[6, 6, 0, 0]} fill="var(--accent-cool)" />
+                        </ComposedChart>
+                      ) : (
+                        <ComposedChart data={historicalChartData} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                          <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={30} />
+                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={30} />
+                          <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} />
+                          <Bar yAxisId="left" dataKey="issues" fill="var(--accent-cool)" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
+                          <Line yAxisId="right" type="monotone" dataKey="velocity" stroke="var(--green)" strokeWidth={2.5} dot={{ fill: 'var(--green)', r: 3 }} />
+                        </ComposedChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Issue type breakdown */}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
+                  {sectionTitle('Issue Breakdown', <PieChart size={15} style={{ color: 'var(--accent-cool)' }} />)}
+
+                  {/* Horizontal stacked bar */}
+                  <div style={{ height: 8, borderRadius: 4, overflow: 'hidden', display: 'flex', marginBottom: 20 }}>
+                    {issueTypes.map(t => (
+                      <div key={t.label} style={{ width: `${t.pct}%`, background: t.color, transition: 'width 0.6s ease' }} />
+                    ))}
+                  </div>
+
+                  {/* List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {issueTypes.map(t => (
+                      <div key={t.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{t.label}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: t.color }}>{t.value}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 32, textAlign: 'right' }}>{t.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
+
+                  {/* Status distribution */}
+                  {sectionTitle('Status', <Activity size={14} style={{ color: 'var(--accent-cool)' }} />)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {statusDistribution.length > 0 ? statusDistribution.map(([status, count]) => {
+                      const pct = maxStatusCount > 0 ? Math.round((count / maxStatusCount) * 100) : 0;
+                      const color = status === 'Done' ? 'var(--green)' : status === 'In Progress' ? 'var(--accent-cool)' : 'var(--amber)';
+                      return (
+                        <div key={status}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{status}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color }}>{count}</span>
+                          </div>
+                          <div style={{ height: 4, background: 'var(--bg-surface)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.6s ease' }} />
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>No status data</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── TEAM CAPACITY + BOTTLENECKS ───────────────────────────── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
+                {/* Team capacity */}
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
+                  {sectionTitle('Team Capacity', <Users size={15} style={{ color: 'var(--accent-cool)' }} />)}
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {enhancedMetrics?.teamCapacity?.length > 0
+                      ? enhancedMetrics.teamCapacity.slice(0, 5).map(member => (
+                        <div
+                          key={member.assignee}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)40' }}
+                        >
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent-cool)20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--accent-cool)', flexShrink: 0 }}>
+                            {member.assignee.charAt(0).toUpperCase()}
+                          </div>
+                          <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                            {member.assignee}
+                          </span>
+                          <div style={{ width: 100, height: 5, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${Math.min(100, member.utilizationPercentage)}%`,
+                              background: member.status === 'overloaded' ? 'var(--red)' : member.status === 'optimal' ? 'var(--green)' : 'var(--amber)',
+                              borderRadius: 3,
+                              transition: 'width 0.6s ease',
+                            }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: member.status === 'overloaded' ? 'var(--red)' : member.status === 'optimal' ? 'var(--green)' : 'var(--amber)', minWidth: 38, textAlign: 'right' }}>
+                            {Math.round(member.utilizationPercentage)}%
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', padding: '2px 7px', background: 'var(--bg-surface)', borderRadius: 4, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
+                            {member.status}
+                          </span>
+                        </div>
+                      ))
+                      : <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No capacity data available.</p>
+                    }
+                  </div>
+
+                  {/* Top assignees by issues */}
+                  {topAssignees.length > 0 && (
+                    <>
+                      <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 16px' }} />
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+                        Issue Distribution
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {topAssignees.map(([assignee, count]) => (
+                          <div key={assignee} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{assignee}</span>
+                            <div style={{ width: 80, height: 4, background: 'var(--bg-surface)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${maxAssigneeCount > 0 ? (count / maxAssigneeCount) * 100 : 0}%`, background: 'var(--accent-cool)', borderRadius: 2 }} />
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', minWidth: 24, textAlign: 'right' }}>{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Bottlenecks + Predictive */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Bottlenecks */}
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', flex: 1 }}>
+                    {sectionTitle('Process Bottlenecks', <AlertTriangle size={15} style={{ color: 'var(--amber)' }} />)}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {enhancedMetrics?.bottleneckAnalysis?.length > 0
+                        ? enhancedMetrics.bottleneckAnalysis.slice(0, 5).map((b, i) => {
+                          const color = b.severity === 'high' ? 'var(--red)' : b.severity === 'medium' ? 'var(--amber)' : 'var(--green)';
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                padding: '10px 14px', borderRadius: 10,
+                                background: `${color}0d`,
+                                border: `1px solid ${color}30`,
+                                borderLeft: `3px solid ${color}`,
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                                  {b.status}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                  {b.issuesStuck} stuck · avg {b.avgTimeInStatus}d
+                                </div>
+                              </div>
+                              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color, padding: '3px 8px', background: `${color}18`, borderRadius: 6 }}>
+                                {b.severity}
+                              </span>
+                              {b.isBottleneck && (
+                                <AlertTriangle size={13} style={{ color }} />
+                              )}
+                            </div>
+                          );
+                        })
+                        : <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No bottlenecks detected.</p>
+                      }
+                    </div>
+                  </div>
+
+                  {/* Predictive analytics mini card */}
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
+                    {sectionTitle('Predictive Analytics', <Sparkles size={15} style={{ color: 'var(--accent-cool)' }} />)}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                      <div style={{ background: 'var(--bg-surface)', borderRadius: 10, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>Completion</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent-cool)' }}>
+                          {enhancedMetrics?.predictiveAnalytics?.completionConfidence ?? '—'}%
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>confidence</div>
+                      </div>
+                      <div style={{ background: 'var(--bg-surface)', borderRadius: 10, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>Forecast Vel.</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {enhancedMetrics?.predictiveAnalytics?.forecastedVelocity ?? '—'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>story pts</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6, textTransform: 'capitalize',
+                        color: enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'increasing' ? 'var(--green)' : enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'decreasing' ? 'var(--red)' : 'var(--amber)',
+                        background: enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'increasing' ? 'var(--green)18' : enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'decreasing' ? 'var(--red)18' : 'var(--amber)18',
+                      }}>
+                        {enhancedMetrics?.predictiveAnalytics?.velocityTrend ?? 'stable'} trend
+                      </span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6, textTransform: 'capitalize',
+                        color: enhancedMetrics?.predictiveAnalytics?.riskLevel === 'high' ? 'var(--red)' : enhancedMetrics?.predictiveAnalytics?.riskLevel === 'medium' ? 'var(--amber)' : 'var(--green)',
+                        background: enhancedMetrics?.predictiveAnalytics?.riskLevel === 'high' ? 'var(--red)18' : enhancedMetrics?.predictiveAnalytics?.riskLevel === 'medium' ? 'var(--amber)18' : 'var(--green)18',
+                      }}>
+                        {enhancedMetrics?.predictiveAnalytics?.riskLevel ?? 'low'} risk
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── HISTORICAL COMPARISON ─────────────────────────────────── */}
+              {enhancedMetrics?.historicalComparison?.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  {sectionTitle('Month-over-Month Comparison', <Calendar size={15} style={{ color: 'var(--accent-cool)' }} />)}
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${enhancedMetrics.historicalComparison.length}, 1fr)`, gap: 16 }}>
+                    {enhancedMetrics.historicalComparison.map((c, i) => (
+                      <div key={i} style={{ background: 'var(--bg-surface)', borderRadius: 12, padding: '16px 18px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 12 }}>{c.period}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent-cool)', letterSpacing: '-0.03em' }}>{c.totalIssues}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Total Issues</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)', letterSpacing: '-0.03em' }}>{c.completionRate}%</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Completion</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                          {c.velocity > (enhancedMetrics.historicalComparison[0]?.velocity || 0) && i > 0
+                            ? <TrendingUp size={13} style={{ color: 'var(--green)' }} />
+                            : i === 0
+                            ? <Activity size={13} style={{ color: 'var(--text-muted)' }} />
+                            : <TrendingDown size={13} style={{ color: 'var(--red)' }} />
+                          }
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Velocity: <strong style={{ color: 'var(--text-primary)' }}>{c.velocity}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── BLOCKERS & FLAGGED ────────────────────────────────────── */}
+              {blockers !== null && ((blockers.blocked.length > 0) || (blockers.flagged.length > 0)) && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--red)40', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--red)15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <AlertTriangle size={15} style={{ color: 'var(--red)' }} />
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Blockers & Flagged Issues</span>
+                    <span style={{ fontSize: 11, background: 'var(--red)18', color: 'var(--red)', borderRadius: 6, padding: '2px 9px', fontWeight: 700, marginLeft: 4 }}>
+                      {blockers.blocked.length + blockers.flagged.length} items
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: blockers.blocked.length > 0 && blockers.flagged.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
+                    {blockers.blocked.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--red)', marginBottom: 10 }}>
+                          Blocked ({blockers.blocked.length})
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {blockers.blocked.slice(0, 6).map(issue => (
+                            <div key={issue.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'var(--red)08', border: '1px solid var(--red)20', borderRadius: 9 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.key}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.summary}</div>
+                              </div>
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>{issue.assignee}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {blockers.flagged.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--amber)', marginBottom: 10 }}>
+                          Flagged / High Priority ({blockers.flagged.length})
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {blockers.flagged.slice(0, 6).map(issue => (
+                            <div key={issue.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'var(--amber)08', border: '1px solid var(--amber)20', borderRadius: 9 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.key}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.summary}</div>
+                              </div>
+                              <span style={{ fontSize: 10, padding: '2px 7px', background: 'var(--amber)20', color: 'var(--amber)', borderRadius: 5, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>{issue.priority}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {blockersLoading && !blockers && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '16px 24px', marginBottom: 28, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-muted)' }}>
+                  <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                  Loading blockers…
+                </div>
+              )}
+
+              {/* ── DUE DATE RISK ─────────────────────────────────────────── */}
+              {enhancedMetrics?.dueDateRisk && enhancedMetrics.dueDateRisk.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  {sectionTitle('Due Date Risk', <Clock size={15} style={{ color: 'var(--amber)' }} />)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {enhancedMetrics.dueDateRisk.map(item => {
+                      const isOverdue = item.isOverdue;
+                      const color = isOverdue ? 'var(--red)' : 'var(--amber)';
+                      return (
+                        <div
+                          key={item.key}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: `${isOverdue ? 'var(--red)' : 'var(--amber)'}08`, border: `1px solid ${isOverdue ? 'var(--red)' : 'var(--amber)'}25`, borderRadius: 10, borderLeft: `3px solid ${color}` }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color }}>{item.key}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.summary}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {item.assignee} · {item.status}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color }}>{item.dueDate}</div>
+                            <div style={{ fontSize: 10, padding: '2px 7px', background: `${color}18`, color, borderRadius: 5, fontWeight: 700, marginTop: 2 }}>
+                              {isOverdue ? 'OVERDUE' : 'DUE SOON'}
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
-                  
-                  {/* Summary Stats */}
-                  <div 
-                    className="grid grid-cols-3 gap-4 pt-4 border-t transition-colors duration-300"
-                    style={{ borderColor: currentTheme.colors.border }}
-                  >
-                    <div className="text-center">
-                      <div 
-                        className="text-2xl font-black transition-colors duration-300" 
-                        style={{ 
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          color: currentTheme.colors.success
-                        }}
-                      >
-                        {statusDistribution.find(([status]) => status === 'Done')?.[1] || 0}
-                      </div>
-                      <div 
-                        className="text-xs font-semibold transition-colors duration-300" 
-                        style={{ 
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          color: currentTheme.colors.textSecondary
-                        }}
-                      >
-                        Completed
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div 
-                        className="text-2xl font-black transition-colors duration-300" 
-                        style={{ 
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          color: currentTheme.colors.info
-                        }}
-                      >
-                        {statusDistribution.find(([status]) => status === 'In Progress')?.[1] || 0}
-                      </div>
-                      <div 
-                        className="text-xs font-semibold transition-colors duration-300" 
-                        style={{ 
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          color: currentTheme.colors.textSecondary
-                        }}
-                      >
-                        Active
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div 
-                        className="text-2xl font-black transition-colors duration-300" 
-                        style={{ 
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          color: currentTheme.colors.warning
-                        }}
-                      >
-                        {statusDistribution.find(([status]) => status === 'To Do')?.[1] || 0}
-                      </div>
-                      <div 
-                        className="text-xs font-semibold transition-colors duration-300" 
-                        style={{ 
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          color: currentTheme.colors.textSecondary
-                        }}
-                      >
-                        Pending
-                      </div>
-                    </div>
+                </div>
+              )}
+
+              {/* ── ISSUE AGE DISTRIBUTION ────────────────────────────────── */}
+              {enhancedMetrics?.issueAgeDistribution && enhancedMetrics.issueAgeDistribution.some(a => a.count > 0) && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  {sectionTitle('Open Issue Age Distribution', <Layers size={15} style={{ color: 'var(--accent-cool)' }} />)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(() => {
+                      const maxAge = Math.max(...(enhancedMetrics.issueAgeDistribution?.map(a => a.count) || [1]));
+                      const colors = ['var(--green)', 'var(--accent-cool)', 'var(--amber)', 'var(--red)'];
+                      return enhancedMetrics.issueAgeDistribution?.map((item, i) => (
+                        <div key={item.range} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 56, flexShrink: 0, fontWeight: 500 }}>{item.range}</span>
+                          <div style={{ flex: 1, height: 10, background: 'var(--bg-surface)', borderRadius: 5, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${maxAge > 0 ? (item.count / maxAge) * 100 : 0}%`, background: colors[i] || 'var(--accent-cool)', borderRadius: 5, transition: 'width 0.8s ease' }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: colors[i] || 'var(--text-primary)', minWidth: 28, textAlign: 'right' }}>{item.count}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-muted)' }}>
+                    Stale open issues (30d+): <strong style={{ color: 'var(--amber)' }}>{(enhancedMetrics.issueAgeDistribution?.find(a => a.range === '31-90d')?.count || 0) + (enhancedMetrics.issueAgeDistribution?.find(a => a.range === '90d+')?.count || 0)}</strong>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
+              )}
 
-        {/* Enhanced Analytics Section */}
-        <motion.div
-          className="space-y-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8, duration: 0.6 }}
-        >
-          {/* Enhanced Features Header */}
-          <motion.div
-            className="flex items-center justify-between"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-          >
-            <div className="space-y-2">
-              <motion.h2
-                className="text-3xl font-bold tracking-tight transition-colors duration-300"
-                style={{
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  color: currentTheme.colors.primary,
-                  background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text'
-                }}
-              >
-                Advanced Analytics
-              </motion.h2>
-              <motion.p
-                className={`text-lg font-medium tracking-wide transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}
-                style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
-              >
-                AI-powered insights and predictive analytics
-              </motion.p>
-            </div>
-
-            {/* Chart View Selector */}
-            <div className="flex items-center space-x-2">
-              <Select value={selectedChartView} onValueChange={(value: 'velocity' | 'burndown' | 'capacity' | 'historical') => setSelectedChartView(value)}>
-                <SelectTrigger className={`w-48 backdrop-blur-xl border-2 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl font-semibold ${
-                  isDarkMode
-                    ? 'bg-gray-800/90 border-gray-600/50 text-white'
-                    : 'bg-white/90 border-gray-300/50 text-black'
-                }`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className={`backdrop-blur-xl border-2 shadow-2xl rounded-2xl transition-colors duration-300 ${
-                  isDarkMode
-                    ? 'bg-gray-800/95 border-gray-600/50'
-                    : 'bg-white/95 border-gray-300/50'
-                }`}>
-                  <SelectItem value="velocity" className="font-medium rounded-xl">
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Sprint Velocity
-                  </SelectItem>
-                  <SelectItem value="burndown" className="font-medium rounded-xl">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Burndown Charts
-                  </SelectItem>
-                  <SelectItem value="capacity" className="font-medium rounded-xl">
-                    <Users className="h-4 w-4 mr-2" />
-                    Team Capacity
-                  </SelectItem>
-                  <SelectItem value="historical" className="font-medium rounded-xl">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Historical Trends
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </motion.div>
-
-          {/* Chart Container */}
-          <motion.div
-            className="grid grid-cols-1 lg:grid-cols-3 gap-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1, duration: 0.6 }}
-          >
-            {/* Main Chart Area */}
-            <motion.div
-              className="lg:col-span-2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 1.2 }}
-            >
-              <Card className={`shadow-2xl hover:shadow-3xl transition-all duration-500 rounded-3xl border backdrop-blur-sm relative overflow-hidden ${
-                isDarkMode
-                  ? 'bg-gray-800/95 border-gray-700/60'
-                  : 'bg-white/98 border-gray-200/60'
-              }`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl font-semibold tracking-wide">
-                    {selectedChartView === 'velocity' && <><TrendingUp className="h-5 w-5 mr-3" />Sprint Velocity Trends</>}
-                    {selectedChartView === 'burndown' && <><BarChart3 className="h-5 w-5 mr-3" />Burndown Chart</>}
-                    {selectedChartView === 'capacity' && <><Users className="h-5 w-5 mr-3" />Team Capacity Analysis</>}
-                    {selectedChartView === 'historical' && <><Calendar className="h-5 w-5 mr-3" />Historical Trends</>}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="h-96">
-                  <ResponsiveContainer width="100%" height="100%">
-                    {selectedChartView === 'velocity' && (
-                      <ComposedChart
-                        data={enhancedMetrics?.sprintVelocityTrends?.map(item => ({
-                          sprint: item.sprintName,
-                          velocity: item.velocity,
-                          committed: item.committedPoints,
-                          completed: item.completedPoints
-                        })) || []}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="sprint" />
-                        <YAxis />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="velocity" stroke={currentTheme.colors.primary} strokeWidth={3} />
-                        <Line type="monotone" dataKey="committed" stroke={currentTheme.colors.secondary} strokeWidth={2} strokeDasharray="5 5" />
-                      </ComposedChart>
-                    )}
-                    {selectedChartView === 'burndown' && (
-                      <ComposedChart
-                        data={enhancedMetrics?.burndownData?.[0]?.dates?.map((date, index) => ({
-                          date,
-                          ideal: enhancedMetrics.burndownData[0].idealBurndown[index],
-                          actual: enhancedMetrics.burndownData[0].actualBurndown[index],
-                          remaining: enhancedMetrics.burndownData[0].remainingWork[index]
-                        })) || []}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="ideal" stroke={currentTheme.colors.success} strokeWidth={2} strokeDasharray="5 5" />
-                        <Line type="monotone" dataKey="actual" stroke={currentTheme.colors.primary} strokeWidth={3} />
-                        <Area type="monotone" dataKey="remaining" fill={currentTheme.colors.warning} fillOpacity={0.3} />
-                      </ComposedChart>
-                    )}
-                    {selectedChartView === 'capacity' && (
-                      <ComposedChart
-                        data={enhancedMetrics?.teamCapacity?.map(item => ({
-                          assignee: item.assignee,
-                          capacity: item.capacity,
-                          workload: item.currentWorkload,
-                          utilization: item.utilizationPercentage
-                        })) || []}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="assignee" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="utilization" fill={currentTheme.colors.primary} />
-                      </ComposedChart>
-                    )}
-                    {selectedChartView === 'historical' && (
-                      <ComposedChart
-                        data={enhancedMetrics?.monthlyTrends?.months?.map((month, index) => ({
-                          month,
-                          issues: enhancedMetrics.monthlyTrends.issues[index],
-                          velocity: enhancedMetrics.monthlyTrends.velocity[index],
-                          completion: enhancedMetrics.monthlyTrends.completionRate[index]
-                        })) || []}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis yAxisId="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip />
-                        <Bar yAxisId="left" dataKey="issues" fill={currentTheme.colors.primary} />
-                        <Line yAxisId="right" type="monotone" dataKey="velocity" stroke={currentTheme.colors.secondary} strokeWidth={3} />
-                      </ComposedChart>
-                    )}
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Sidebar with Predictive Analytics */}
-            <motion.div
-              className="space-y-6"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 1.4 }}
-            >
-              {/* Predictive Analytics Card */}
-              <Card className={`shadow-xl hover:shadow-2xl transition-all duration-500 rounded-3xl border backdrop-blur-sm ${
-                isDarkMode
-                  ? 'bg-gray-800/95 border-gray-700/60'
-                  : 'bg-white/98 border-gray-200/60'
-              }`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg font-semibold">
-                    <Sparkles className="h-5 w-5 mr-3" />
-                    Predictive Analytics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div
-                      className="p-3 rounded-xl"
-                      style={{
-                        backgroundColor: isDarkMode ? applyAlpha(currentTheme.colors.surface, 0.4) : applyAlpha(currentTheme.colors.surface, 0.8),
-                        border: `1px solid ${applyAlpha(currentTheme.colors.border, 0.4)}`
-                      }}
-                    >
-                      <div
-                        className="text-sm font-medium"
-                        style={{ color: currentTheme.colors.textSecondary }}
-                      >
-                        Completion Date
-                      </div>
-                      <div
-                        className="text-lg font-bold"
-                        style={{ color: currentTheme.colors.text }}
-                      >
-                        {enhancedMetrics?.predictiveAnalytics?.sprintCompletionDate || 'TBD'}
-                      </div>
-                    </div>
-                    <div
-                      className="p-3 rounded-xl"
-                      style={{
-                        backgroundColor: isDarkMode ? applyAlpha(currentTheme.colors.surface, 0.4) : applyAlpha(currentTheme.colors.surface, 0.8),
-                        border: `1px solid ${applyAlpha(currentTheme.colors.border, 0.4)}`
-                      }}
-                    >
-                      <div
-                        className="text-sm font-medium"
-                        style={{ color: currentTheme.colors.textSecondary }}
-                      >
-                        Confidence
-                      </div>
-                      <div
-                        className="text-lg font-bold"
-                        style={{ color: currentTheme.colors.success }}
-                      >
-                        {enhancedMetrics?.predictiveAnalytics?.completionConfidence || 0}%
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Velocity Trend</div>
-                    <Badge
-                      variant="outline"
-                      style={{
-                        color: enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'decreasing'
-                          ? currentTheme.colors.warning
-                          : currentTheme.colors.success,
-                        borderColor: applyAlpha(
-                          enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'decreasing'
-                            ? currentTheme.colors.warning
-                            : currentTheme.colors.success,
-                          0.4
-                        ),
-                        backgroundColor: applyAlpha(
-                          enhancedMetrics?.predictiveAnalytics?.velocityTrend === 'decreasing'
-                            ? currentTheme.colors.warning
-                            : currentTheme.colors.success,
-                          isDarkMode ? 0.2 : 0.1
-                        )
-                      }}
-                    >
-                      {enhancedMetrics?.predictiveAnalytics?.velocityTrend || 'stable'}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Risk Level</div>
-                    <Badge
-                      variant="outline"
-                      style={{
-                        color: enhancedMetrics?.predictiveAnalytics?.riskLevel === 'high'
-                          ? currentTheme.colors.error
-                          : enhancedMetrics?.predictiveAnalytics?.riskLevel === 'medium'
-                            ? currentTheme.colors.warning
-                            : currentTheme.colors.success,
-                        borderColor: applyAlpha(
-                          enhancedMetrics?.predictiveAnalytics?.riskLevel === 'high'
-                            ? currentTheme.colors.error
-                            : enhancedMetrics?.predictiveAnalytics?.riskLevel === 'medium'
-                              ? currentTheme.colors.warning
-                              : currentTheme.colors.success,
-                          0.4
-                        ),
-                        backgroundColor: applyAlpha(
-                          enhancedMetrics?.predictiveAnalytics?.riskLevel === 'high'
-                            ? currentTheme.colors.error
-                            : enhancedMetrics?.predictiveAnalytics?.riskLevel === 'medium'
-                              ? currentTheme.colors.warning
-                              : currentTheme.colors.success,
-                          isDarkMode ? 0.2 : 0.1
-                        )
-                      }}
-                    >
-                      {enhancedMetrics?.predictiveAnalytics?.riskLevel || 'medium'}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Bottleneck Analysis Card */}
-              <Card className={`shadow-xl hover:shadow-2xl transition-all duration-500 rounded-3xl border backdrop-blur-sm ${
-                isDarkMode
-                  ? 'bg-gray-800/95 border-gray-700/60'
-                  : 'bg-white/98 border-gray-200/60'
-              }`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg font-semibold">
-                    <AlertTriangle className="h-5 w-5 mr-3" />
-                    Process Bottlenecks
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {enhancedMetrics?.bottleneckAnalysis?.filter(b => b.isBottleneck).map((bottleneck, index) => {
-                      const severityColor = bottleneck.severity === 'high'
-                        ? currentTheme.colors.error
-                        : bottleneck.severity === 'medium'
-                          ? currentTheme.colors.warning
-                          : currentTheme.colors.info;
+              {/* ── BEST PERFORMERS ───────────────────────────────────────── */}
+              {performers.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  {sectionTitle('Best Performers', <Trophy size={15} style={{ color: 'var(--amber)' }} />)}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                    {performers.slice(0, 6).map((p, i) => {
+                      const rankColor = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--text-muted)';
+                      const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${p.rank}`;
                       return (
-                      <div
-                        key={index}
-                        className="p-3 rounded-xl border-l-4"
-                        style={{
-                          borderLeftColor: severityColor,
-                          backgroundColor: applyAlpha(severityColor, isDarkMode ? 0.25 : 0.15)
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{bottleneck.status}</span>
-                          <Badge
-                            variant="outline"
-                            style={{
-                              color: severityColor,
-                              borderColor: applyAlpha(severityColor, 0.4),
-                              backgroundColor: applyAlpha(severityColor, isDarkMode ? 0.2 : 0.1)
-                            }}
-                          >
-                            {bottleneck.severity}
-                          </Badge>
-                        </div>
-                        <div
-                          className="text-sm mt-1"
-                          style={{ color: currentTheme.colors.textSecondary }}
-                        >
-                          {bottleneck.issuesStuck} issues stuck, avg {bottleneck.avgTimeInStatus} days
-                        </div>
-                      </div>
-                    )}) || (
-                      <div
-                        className="text-center py-4"
-                        style={{ color: currentTheme.colors.textSecondary }}
-                      >
-                        No bottlenecks detected
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* AI Recommendations Card */}
-              <Card className={`shadow-xl hover:shadow-2xl transition-all duration-500 rounded-3xl border backdrop-blur-sm ${
-                isDarkMode
-                  ? 'bg-gray-800/95 border-gray-700/60'
-                  : 'bg-white/98 border-gray-200/60'
-              }`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg font-semibold">
-                    <Brain className="h-5 w-5 mr-3" />
-                    AI Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {enhancedMetrics?.predictiveAnalytics?.recommendations?.map((rec, index) => (
-                      <div
-                        key={index}
-                        className="p-3 rounded-xl"
-                        style={{
-                          backgroundColor: isDarkMode ? applyAlpha(currentTheme.colors.surface, 0.45) : applyAlpha(currentTheme.colors.surface, 0.85),
-                          border: `1px solid ${applyAlpha(currentTheme.colors.border, 0.4)}`
-                        }}
-                      >
-                        <div className="flex items-start space-x-2">
-                          <Lightbulb
-                            className="h-4 w-4 mt-0.5 flex-shrink-0"
-                            style={{ color: currentTheme.colors.warning }}
-                          />
-                          <span className="text-sm">{rec}</span>
-                        </div>
-                      </div>
-                    )) || (
-                      <div
-                        className="text-center py-4"
-                        style={{ color: currentTheme.colors.textSecondary }}
-                      >
-                        No recommendations available
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-
-          {/* Historical Comparison Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.6, duration: 0.6 }}
-          >
-            <Card className={`shadow-2xl hover:shadow-3xl transition-all duration-500 rounded-3xl border backdrop-blur-sm ${
-              isDarkMode
-                ? 'bg-gray-800/95 border-gray-700/60'
-                : 'bg-white/98 border-gray-200/60'
-            }`}>
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl font-semibold">
-                  <Calendar className="h-5 w-5 mr-3" />
-                  Month-over-Month Comparison
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {enhancedMetrics?.historicalComparison?.map((comparison, index) => (
-                    <motion.div
-                      key={index}
-                      className={`p-6 rounded-2xl border transition-all duration-300 ${
-                        isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-white border-gray-200'
-                      }`}
-                      whileHover={{ scale: 1.02 }}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1.8 + index * 0.1 }}
-                    >
-                      <div className="text-center space-y-3">
-                        <h3 className="text-lg font-semibold">{comparison.period}</h3>
-                        <div className="grid grid-cols-2 gap-4 text-center">
-                          <div>
-                            <div
-                              className="text-2xl font-bold"
-                              style={{ color: currentTheme.colors.info }}
-                            >
-                              {comparison.totalIssues}
+                        <div key={p.name} style={{ background: 'var(--bg-surface)', borderRadius: 12, padding: '14px 16px', border: i < 3 ? `1px solid ${rankColor}40` : '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: i < 3 ? `${rankColor}20` : 'var(--accent-cool)15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: i < 3 ? 16 : 13, fontWeight: 700, color: i < 3 ? rankColor : 'var(--accent-cool)', flexShrink: 0 }}>
+                              {i < 3 ? rankIcon : p.name.charAt(0).toUpperCase()}
                             </div>
-                            <div
-                              className="text-sm"
-                              style={{ color: currentTheme.colors.textSecondary }}
-                            >
-                              Total Issues
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                              <div style={{ fontSize: 10, color: i < 3 ? rankColor : 'var(--text-muted)', fontWeight: 600 }}>Rank #{p.rank}</div>
                             </div>
                           </div>
-                          <div>
-                            <div
-                              className="text-2xl font-bold"
-                              style={{ color: currentTheme.colors.success }}
-                            >
-                              {comparison.completionRate}%
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                            <div style={{ background: 'var(--bg-card)', borderRadius: 7, padding: '6px 8px' }}>
+                              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--green)' }}>{p.issuesResolved}</div>
+                              <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resolved</div>
                             </div>
-                            <div
-                              className="text-sm"
-                              style={{ color: currentTheme.colors.textSecondary }}
-                            >
-                              Completion
+                            <div style={{ background: 'var(--bg-card)', borderRadius: 7, padding: '6px 8px' }}>
+                              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent-cool)' }}>{p.storyPoints}</div>
+                              <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Story Pts</div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center justify-center space-x-2">
-                          {comparison.velocity > (enhancedMetrics.historicalComparison?.[0]?.velocity || 0) ? (
-                            <TrendingUp className="h-4 w-4" style={{ color: currentTheme.colors.success }} />
-                          ) : (
-                            <TrendingDown className="h-4 w-4" style={{ color: currentTheme.colors.error }} />
+                          {p.achievements.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {p.achievements.slice(0, 2).map(a => (
+                                <span key={a} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--amber)15', color: 'var(--amber)', borderRadius: 4, fontWeight: 600 }}>{a}</span>
+                              ))}
+                            </div>
                           )}
-                          <span className="text-sm font-medium">Velocity: {comparison.velocity}</span>
+                          {/* Score bar */}
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                              <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>{p.performanceScore}</span>
+                            </div>
+                            <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(100, p.performanceScore)}%`, background: i < 3 ? rankColor : 'var(--accent-cool)', borderRadius: 2, transition: 'width 0.8s ease' }} />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      );
+                    })}
+                  </div>
+                  {performersLoading && performers.length === 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-muted)' }}>
+                      <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                      Loading performers…
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
+              )}
 
-        {/* Export Options */}
-        <motion.div
-          className="flex items-center justify-between pt-8 border-t border-gray-200 dark:border-gray-700"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 2.0 }}
-        >
-          <div className="flex items-center space-x-4">
-            <Select value={exportFormat} onValueChange={(value: 'pdf' | 'excel' | 'csv' | 'json') => setExportFormat(value)}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pdf">PDF</SelectItem>
-                <SelectItem value="excel">Excel</SelectItem>
-                <SelectItem value="csv">CSV</SelectItem>
-                <SelectItem value="json">JSON</SelectItem>
-              </SelectContent>
-            </Select>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                onClick={() => handleEnhancedExport()}
-                className="text-white shadow-xl border-0 rounded-2xl font-semibold px-6 py-3 hover:shadow-2xl transition-all duration-300"
-                style={{
-                  backgroundColor: currentTheme.colors.accent,
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export Enhanced Data
-              </Button>
-            </motion.div>
-          </div>
+              {/* ── AI RECOMMENDATIONS ────────────────────────────────────── */}
+              {enhancedMetrics?.predictiveAnalytics?.recommendations?.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  {sectionTitle('AI Recommendations', <Brain size={15} style={{ color: 'var(--accent-cool)' }} />)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {enhancedMetrics.predictiveAnalytics.recommendations.map((rec, i) => (
+                      <div
+                        key={i}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}
+                      >
+                        <Lightbulb size={14} style={{ color: 'var(--amber)', flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{rec}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setWidgetLayout(prev => ({ ...prev, velocity: !prev.velocity }))}
-              style={{ color: widgetLayout.velocity ? currentTheme.colors.info : currentTheme.colors.textSecondary }}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setWidgetLayout(prev => ({ ...prev, burndown: !prev.burndown }))}
-              style={{ color: widgetLayout.burndown ? currentTheme.colors.info : currentTheme.colors.textSecondary }}
-            >
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setWidgetLayout(prev => ({ ...prev, capacity: !prev.capacity }))}
-              style={{ color: widgetLayout.capacity ? currentTheme.colors.info : currentTheme.colors.textSecondary }}
-            >
-              <Users className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setWidgetLayout(prev => ({ ...prev, predictive: !prev.predictive }))}
-              style={{ color: widgetLayout.predictive ? currentTheme.colors.info : currentTheme.colors.textSecondary }}
-            >
-              <Sparkles className="h-4 w-4" />
-            </Button>
-          </div>
-        </motion.div>
+              {/* ── RECENT ACTIVITY ───────────────────────────────────────── */}
+              {recentActivities.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 28 }}>
+                  {sectionTitle('Recent Activity', <Activity size={15} style={{ color: 'var(--accent-cool)' }} />)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {recentActivities.slice(0, 8).map((activity, i) => (
+                      <div
+                        key={activity.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < Math.min(7, recentActivities.length - 1) ? '1px solid var(--border)30' : 'none' }}
+                      >
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Zap size={13} style={{ color: 'var(--accent-cool)' }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {activity.title}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                            {activity.user} · {activity.project}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {activity.timestamp}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
+              {/* ── FOOTER EXPORT ROW ─────────────────────────────────────── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 4 }}>Export as:</span>
+                <Select value={exportFormat} onValueChange={v => setExportFormat(v as typeof exportFormat)}>
+                  <SelectTrigger style={{ width: 110, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 9, fontSize: 12, color: 'var(--text-primary)', height: 34 }}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <SelectItem value="pdf">PDF</SelectItem>
+                    <SelectItem value="excel">Excel</SelectItem>
+                    <SelectItem value="csv">CSV</SelectItem>
+                    <SelectItem value="json">JSON</SelectItem>
+                  </SelectContent>
+                </Select>
+                <button
+                  onClick={handleEnhancedExport}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '6px 16px', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  <Download size={13} />
+                  Download
+                </button>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
+                  Last updated {lastRefresh.toLocaleString()}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* CSS keyframes for spin animation */}
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+    </DashboardLayout>
   );
 }

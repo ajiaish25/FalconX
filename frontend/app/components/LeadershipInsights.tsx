@@ -487,9 +487,9 @@ export function FalconXInsights() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <p className="text-sm font-medium text-green-600 dark:text-green-300">Total Stories</p>
+                    <p className="text-sm font-medium text-[var(--text-secondary)]">Total Stories</p>
                     <div className="group relative">
-                      <Info className="h-3 w-3 text-green-400 cursor-help" />
+                      <Info className="h-3 w-3 text-[var(--text-secondary)] cursor-help" />
                       <div className="absolute left-0 top-5 hidden group-hover:block bg-black text-white text-xs rounded p-2 w-48 z-10">
                         User stories across all projects and statuses
                       </div>
@@ -498,11 +498,11 @@ export function FalconXInsights() {
                   {isLoading ? (
                     <div className="h-9 bg-green-200 rounded animate-pulse mb-1"></div>
                   ) : (
-                    <p className="text-3xl font-bold text-green-700 dark:text-green-200 animate-in fade-in-50 duration-1000 delay-200">
+                    <p className="text-3xl font-bold text-[var(--text-primary)] animate-in fade-in-50 duration-1000 delay-200">
                       {analytics.summary.total_stories}
                     </p>
                   )}
-                  <p className="text-xs text-green-500 mt-1 animate-in slide-in-from-bottom-2 duration-700 delay-400">
+                  <p className="text-xs text-[var(--text-secondary)] mt-1 animate-in slide-in-from-bottom-2 duration-700 delay-400">
                     User Stories
                   </p>
                 </div>
@@ -517,9 +517,9 @@ export function FalconXInsights() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-red-600 dark:text-red-300">Total Defects</p>
-                  <p className="text-3xl font-bold text-red-700 dark:text-red-200">{analytics.summary.total_defects}</p>
-                  <p className="text-xs text-red-500 mt-1">Bug Reports</p>
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">Total Defects</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)]">{analytics.summary.total_defects}</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">Bug Reports</p>
                 </div>
                 <div className="p-3 bg-red-500 rounded-full">
                   <Bug className="w-6 h-6 text-white" />
@@ -610,7 +610,7 @@ export function FalconXInsights() {
           <Card className="overflow-hidden">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center space-x-2">
-                <Target className="w-5 h-5 text-green-500 animate-pulse" />
+                <Target className="w-5 h-5 text-[var(--text-secondary)] animate-pulse" />
                 <span>Top Performer</span>
               </CardTitle>
               <CardDescription>Highest velocity contributor this period</CardDescription>
@@ -658,15 +658,15 @@ export function FalconXInsights() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-sm text-gray-800 dark:text-gray-200">
-              Velocity trend is <span className={`${velocityTrend === 'upward' ? 'text-green-600' : velocityTrend === 'downward' ? 'text-red-600' : 'text-gray-500'}`}>{velocityTrend}</span> with an average change of {averageVelocityDelta.toFixed(1)} points per sprint. If this persists, next sprint is projected at <span className="font-semibold">{projectedNextVelocity}</span> completed points.
+              Velocity trend is <span className="text-[var(--text-secondary)]">{velocityTrend}</span> with an average change of {averageVelocityDelta.toFixed(1)} points per sprint. If this persists, next sprint is projected at <span className="font-semibold">{projectedNextVelocity}</span> completed points.
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
               Current defect ratio is {defectRatio.toFixed(1)}%. {defectRatio > 40 ? 'High defects may impact delivery; consider quality focus.' : 'Defect ratio is manageable; maintain quality controls.'}
             </div>
             <div className="flex space-x-2 text-xs">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Projection</Badge>
+              <Badge variant="outline" className="bg-green-50 text-[var(--text-secondary)] border-green-200">Projection</Badge>
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Velocity</Badge>
-              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Quality</Badge>
+              <Badge variant="outline" className="bg-red-50 text-[var(--text-secondary)] border-red-200">Quality</Badge>
             </div>
           </CardContent>
         </Card>
@@ -675,7 +675,7 @@ export function FalconXInsights() {
         <Card className="overflow-hidden">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="w-5 h-5 text-orange-500 animate-pulse" />
+              <BarChart3 className="w-5 h-5 text-[var(--text-secondary)] animate-pulse" />
               <span>Project Distribution</span>
             </CardTitle>
             <CardDescription>Issue breakdown across all projects</CardDescription>
@@ -699,11 +699,11 @@ export function FalconXInsights() {
                     <div className="space-y-3 mb-4">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400 font-medium">Stories</span>
-                        <span className="font-bold text-green-600 text-lg">{project.stories}</span>
+                        <span className="font-bold text-[var(--text-primary)] text-lg">{project.stories}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400 font-medium">Defects</span>
-                        <span className="font-bold text-red-600 text-lg">{project.defects}</span>
+                        <span className="font-bold text-[var(--text-primary)] text-lg">{project.defects}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400 font-medium">Tasks</span>
@@ -751,9 +751,9 @@ export function FalconXInsights() {
                   <Zap className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-300">Avg Velocity</p>
-                  <p className="text-3xl font-bold text-yellow-700 dark:text-yellow-200 animate-bounce">47.2</p>
-                  <p className="text-xs text-yellow-500 mt-1">Story Points/Sprint</p>
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">Avg Velocity</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)] animate-bounce">47.2</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">Story Points/Sprint</p>
                 </div>
               </div>
             </CardContent>
@@ -781,9 +781,9 @@ export function FalconXInsights() {
                   <Award className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-300">Success Rate</p>
-                  <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-200 animate-bounce">94.2%</p>
-                  <p className="text-xs text-emerald-500 mt-1">Sprint Completion</p>
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">Success Rate</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)] animate-bounce">94.2%</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">Sprint Completion</p>
                 </div>
               </div>
             </CardContent>
@@ -817,7 +817,7 @@ export function FalconXInsights() {
               {strategicInsights.risk_assessment && strategicInsights.risk_assessment.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <AlertTriangle className="h-4 w-4 text-[var(--text-secondary)]" />
                     Risk Assessment
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -845,7 +845,7 @@ export function FalconXInsights() {
               {strategicInsights.opportunities && strategicInsights.opportunities.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-green-600" />
+                    <Zap className="h-4 w-4 text-[var(--text-secondary)]" />
                     Growth Opportunities
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -854,7 +854,7 @@ export function FalconXInsights() {
                         <CardContent className="p-4">
                           <h5 className="font-medium mb-2">{opportunity.title}</h5>
                           <p className="text-sm text-muted-foreground mb-2">{opportunity.description}</p>
-                          <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                          <p className="text-sm font-medium text-[var(--text-secondary)]">
                             🎯 {opportunity.potential_impact}
                           </p>
                         </CardContent>

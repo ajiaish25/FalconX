@@ -10,6 +10,8 @@ interface SettingsData {
   githubToken: string
   slackToken: string
   slackChannel: string
+  salesforceInstanceUrl: string
+  salesforceClientId: string
   userProfile: {
     name: string
     email: string
@@ -32,6 +34,8 @@ const defaultSettings: SettingsData = {
   githubToken: '',
   slackToken: '',
   slackChannel: '',
+  salesforceInstanceUrl: '',
+  salesforceClientId: '',
   userProfile: {
     name: 'Alex Chen',
     email: 'alex.chen@company.com',

@@ -7,14 +7,45 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { 
-  RefreshCw, Download, AlertTriangle, Bug, AlertCircle, 
+import {
+  RefreshCw, Download, AlertTriangle, Bug, AlertCircle,
   CheckCircle, Activity, BarChart3, PieChart, Award, FileText, Sheet,
   ChevronRight, Building2, Code, Zap
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getApiUrl } from '../../lib/api-config';
 import { LoadingSkeleton } from './figma/InsightsDashboard/components/LoadingSkeleton';
+import { DashboardLayout } from './DashboardLayout';
+
+// ─── CDK palette (single source: globals.css / themes.ts) ─────────────────────
+const DS = {
+  pageBg:        'var(--bg-page)',
+  cardBg:        'var(--bg-card)',
+  surface:       'var(--bg-surface)',
+  hover:         'var(--bg-hover)',
+  active:        'var(--bg-active)',
+  border:        'var(--border)',
+  borderStrong:  'var(--border-strong)',
+  textPrimary:   'var(--text-primary)',
+  textSecondary: 'var(--text-secondary)',
+  textMuted:     'var(--text-muted)',
+  green:         'var(--green)',
+  greenBg:       'var(--green-bg)',
+  amber:         'var(--amber)',
+  amberBg:       'var(--amber-bg)',
+  red:           'var(--red)',
+  redBg:         'var(--red-bg)',
+  blue:          'var(--blue)',
+  blueBg:        'var(--blue-bg)',
+  font:          'var(--font)',
+  mono:          'var(--mono)',
+} as const;
+
+const card = {
+  background: DS.cardBg,
+  border: '1px solid var(--border)',
+  borderRadius: '12px',
+} as const;
 
 interface KPIMetricsData {
   defect_count: number;
@@ -107,27 +138,23 @@ export function KPIMetricsDashboard() {
     change_percentage: number | null;
   } | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
-  
+
   const [options, setOptions] = useState<DropdownOptions>({
     portfolios: ['All'],
     project_keys: ['All'],
     project_names: ['All'],
     rca_values: ['All']
   });
-  
+
   const [selectedPortfolio, setSelectedPortfolio] = useState('All');
   const [selectedProjectKey, setSelectedProjectKey] = useState('All');
   const [selectedProjectName, setSelectedProjectName] = useState('All');
   const [selectedRCA, setSelectedRCA] = useState('All');
 
-  useEffect(() => {
-    fetchDropdownOptions();
-  }, []);
+  useEffect(() => { fetchDropdownOptions(); }, []);
 
   useEffect(() => {
-    if (selectedPortfolio !== 'All') {
-      fetchDropdownOptions(selectedPortfolio);
-    }
+    if (selectedPortfolio !== 'All') fetchDropdownOptions(selectedPortfolio);
   }, [selectedPortfolio]);
 
   useEffect(() => {
@@ -136,7 +163,7 @@ export function KPIMetricsDashboard() {
 
   const fetchDropdownOptions = async (portfolio?: string) => {
     try {
-      const url = portfolio && portfolio !== 'All' 
+      const url = portfolio && portfolio !== 'All'
         ? `/api/kpi-metrics/options?portfolio=${encodeURIComponent(portfolio)}`
         : '/api/kpi-metrics/options';
       const response = await fetch(getApiUrl(url));
@@ -159,7 +186,6 @@ export function KPIMetricsDashboard() {
   const fetchKPIMetrics = async () => {
     setLoading(true);
     setError(null);
-    
     try {
       const response = await fetch(getApiUrl('/api/kpi-metrics'), {
         method: 'POST',
@@ -171,12 +197,9 @@ export function KPIMetricsDashboard() {
           rca: selectedRCA
         })
       });
-
       if (!response.ok) throw new Error('Failed to fetch KPI metrics');
-      
       const result = await response.json();
       if (result.success) {
-        // Ensure all arrays exist with defaults
         const dataWithDefaults = {
           ...result.data,
           defect_details: result.data.defect_details || [],
@@ -184,25 +207,14 @@ export function KPIMetricsDashboard() {
           automation_details: result.data.automation_details || [],
           projects_list: result.data.projects_list || []
         };
-        console.log('KPI Metrics Data:', {
-          defect_details_count: dataWithDefaults.defect_details?.length || 0,
-          bug_details_count: dataWithDefaults.bug_details?.length || 0,
-          automation_details_count: dataWithDefaults.automation_details?.length || 0,
-          selectedPortfolio,
-          selectedProjectKey,
-          selectedProjectName
-        });
         setData(dataWithDefaults);
         setDataKey(prev => prev + 1);
-        
-        // Fetch AI insights after data is loaded
         fetchAIInsights(selectedPortfolio, selectedProjectKey, selectedProjectName, selectedRCA);
       } else {
         setError(result.error || 'Failed to load data');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
-      console.error('Error fetching KPI metrics:', err);
     } finally {
       setLoading(false);
     }
@@ -214,19 +226,11 @@ export function KPIMetricsDashboard() {
       const response = await fetch(getApiUrl('/api/kpi-metrics/ai-insights'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          portfolio,
-          project_key: projectKey,
-          project_name: projectName,
-          rca
-        })
+        body: JSON.stringify({ portfolio, project_key: projectKey, project_name: projectName, rca })
       });
-
       if (response.ok) {
         const result = await response.json();
-        if (result.success && result.insights) {
-          setAiInsights(result.insights);
-        }
+        if (result.success && result.insights) setAiInsights(result.insights);
       }
     } catch (err) {
       console.error('Error fetching AI insights:', err);
@@ -237,7 +241,6 @@ export function KPIMetricsDashboard() {
 
   const exportToCSV = () => {
     if (!data) return;
-    
     const csv = [
       ['Metric', 'Value'],
       ['Defect Count', data.defect_count || 0],
@@ -247,7 +250,6 @@ export function KPIMetricsDashboard() {
       ['Committed TC', data.automation_metrics?.committed_tc_count || 0],
       ['Completed TC', data.automation_metrics?.completed_tc_count || 0]
     ].map(row => row.join(',')).join('\n');
-    
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -261,51 +263,39 @@ export function KPIMetricsDashboard() {
 
   const exportToPDF = () => {
     if (!data) return;
-    
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
-        <html>
-          <head>
-            <title>KPI Metrics Report</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              h1 { color: #333; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-              th { background-color: #f5f5f5; }
-            </style>
-          </head>
-          <body>
-            <h1>KPI Metrics Report</h1>
-            <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-            <table>
-              <tr><th>Metric</th><th>Value</th></tr>
-              <tr><td>Defect Count</td><td>${data.defect_count || 0}</td></tr>
-              <tr><td>Bug Count</td><td>${data.bug_count || 0}</td></tr>
-              <tr><td>Automation %</td><td>${data.automation_metrics?.automation_percentage || 0}%</td></tr>
-              <tr><td>Completion %</td><td>${data.automation_metrics?.completion_percentage || 0}%</td></tr>
-            </table>
-          </body>
-        </html>
+        <html><head><title>KPI Metrics Report</title>
+        <style>body{font-family:Arial,sans-serif;margin:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:10px;text-align:left;border-bottom:1px solid #ccc;}th{background:#f5f5f5;}</style>
+        </head><body>
+        <h1>KPI Metrics Report</h1>
+        <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+        <table>
+          <tr><th>Metric</th><th>Value</th></tr>
+          <tr><td>Defect Count</td><td>${data.defect_count || 0}</td></tr>
+          <tr><td>Bug Count</td><td>${data.bug_count || 0}</td></tr>
+          <tr><td>Automation %</td><td>${data.automation_metrics?.automation_percentage || 0}%</td></tr>
+          <tr><td>Completion %</td><td>${data.automation_metrics?.completion_percentage || 0}%</td></tr>
+        </table></body></html>
       `);
       printWindow.document.close();
       setTimeout(() => printWindow.print(), 250);
     }
   };
 
-  if (loading && !data) {
-    return <LoadingSkeleton />;
-  }
+  if (loading && !data) return <LoadingSkeleton />;
 
   if (error && !data) {
     return (
-      <div className="h-full p-6" style={{ backgroundColor: currentTheme.colors.background }}>
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
+      <DashboardLayout>
+        <div style={{ padding: '24px', fontFamily: DS.font }}>
+          <div style={{ background: DS.redBg, border: `1px solid ${DS.red}`, borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle style={{ color: DS.red, flexShrink: 0 }} size={16} />
+            <span style={{ color: DS.red, fontSize: '14px' }}>{error}</span>
+          </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -316,1091 +306,689 @@ export function KPIMetricsDashboard() {
   const automationPct = data.automation_metrics?.automation_percentage || 0;
   const completionPct = data.automation_metrics?.completion_percentage || 0;
 
+  // ─── Shared label style for select dropdowns ──────────────────────────────
+  const labelStyle: React.CSSProperties = {
+    fontSize: '11px',
+    color: DS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    fontWeight: 500,
+    marginBottom: '6px',
+    display: 'block',
+    fontFamily: DS.font,
+  };
+
+  const selectTriggerStyle: React.CSSProperties = {
+    background: DS.surface,
+    border: `1px solid ${DS.border}`,
+    borderRadius: '8px',
+    color: DS.textPrimary,
+    fontSize: '13px',
+    fontFamily: DS.font,
+  };
+
+  // ── Gauge ring helper ────────────────────────────────────────────────────
+  const GaugeRing = ({ value, max = 100, color, size = 96 }: { value: number; max?: number; color: string; size?: number }) => {
+    const r = (size - 12) / 2;
+    const circ = 2 * Math.PI * r;
+    const pct = Math.min(value / max, 1);
+    const dash = pct * circ;
+    return (
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={DS.border} strokeWidth={10} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke={color} strokeWidth={10}
+          strokeDasharray={`${dash} ${circ}`}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dasharray 1.2s ease' }}
+        />
+      </svg>
+    );
+  };
+
   return (
-    <div 
-      className="h-full overflow-auto transition-all duration-300 bg-slate-50 dark:bg-slate-900"
-    >
-      <div className="p-6 w-full space-y-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
-          <div>
-            <h1 
-              className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100"
-            >
-              CDK KPI METRICS
-            </h1>
-            <div className="flex items-center gap-3 mt-2">
-              <p className="text-lg text-slate-700 dark:text-slate-300">
-                Comprehensive Performance Indicators Dashboard
-              </p>
-              {data?.projects_list?.length > 0 && (
-                <Badge 
-                  variant="outline"
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100"
-                >
-                  {data.projects_list.length} Projects
-                </Badge>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <Button
-              onClick={fetchKPIMetrics}
-              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70"
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Generate Report
-            </Button>
-            <Button
-              onClick={exportToCSV}
-              className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg px-4 py-2 text-sm font-medium"
-              disabled={!data}
-            >
-              <Sheet className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              onClick={exportToPDF}
-              className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg px-4 py-2 text-sm font-medium"
-              disabled={!data}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-          </div>
-        </motion.div>
+    <DashboardLayout>
+      <div className="flex-1 min-h-0 overflow-auto" style={{ padding: '24px', fontFamily: DS.font }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-        {/* Filters */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-100">
-              Portfolio
-            </label>
-            <Select value={selectedPortfolio} onValueChange={(value) => {
-              setSelectedPortfolio(value);
-              setSelectedProjectKey('All');
-              setSelectedProjectName('All');
-            }}>
-              <SelectTrigger className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.portfolios.map((portfolio) => (
-                  <SelectItem key={portfolio} value={portfolio}>
-                    {portfolio}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-100">
-              Project Key
-            </label>
-            <Select value={selectedProjectKey} onValueChange={setSelectedProjectKey}>
-              <SelectTrigger className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.project_keys.map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {key}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-100">
-              Project Name
-            </label>
-            <Select value={selectedProjectName} onValueChange={setSelectedProjectName}>
-              <SelectTrigger className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.project_names.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-100">
-              RCA (Root Cause)
-              <span className="text-xs ml-1 text-slate-600 dark:text-slate-400">
-                (Bug & Defect only)
-              </span>
-            </label>
-            <Select value={selectedRCA} onValueChange={setSelectedRCA}>
-              <SelectTrigger className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.rca_values.map((rca) => (
-                  <SelectItem key={rca} value={rca}>
-                    {rca}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          </div>
-        </motion.div>
-
-        {/* AI Insights Section */}
-        {(aiInsights || loadingInsights) && (
+          {/* ── Header ───────────────────────────────────────────────────── */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}
+          >
+            {/* Left: title block */}
+            <div>
+              <p style={{ color: 'var(--accent-cool)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 6px' }}>
+                Key Performance Indicators
+              </p>
+              <h1 style={{ fontSize: '26px', fontWeight: 800, color: DS.textPrimary, letterSpacing: '-0.04em', margin: 0 }}>
+                CDK KPI Metrics
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                <p style={{ fontSize: '14px', color: DS.textSecondary, margin: 0 }}>
+                  Comprehensive Performance Indicators Dashboard
+                </p>
+                {data?.projects_list?.length > 0 && (
+                  <span style={{ background: DS.blueBg, color: DS.blue, border: `1px solid ${DS.blue}30`, borderRadius: '20px', padding: '2px 10px', fontSize: '11px', fontWeight: 600 }}>
+                    {data.projects_list.length} Projects
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Right: action buttons */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                onClick={fetchKPIMetrics}
+                disabled={loading}
+                style={{ background: 'var(--accent-cool)', color: 'var(--bg-page)', border: 'none', borderRadius: '10px', padding: '9px 18px', fontSize: '13px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: loading ? 0.7 : 1, fontFamily: DS.font, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+              >
+                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                Refresh
+              </button>
+              <button
+                onClick={exportToCSV}
+                disabled={!data}
+                style={{ background: DS.surface, color: DS.textPrimary, border: `1px solid ${DS.border}`, borderRadius: '10px', padding: '9px 16px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: DS.font }}
+              >
+                <Sheet size={14} />
+                CSV
+              </button>
+              <button
+                onClick={exportToPDF}
+                disabled={!data}
+                style={{ background: DS.surface, color: DS.textPrimary, border: `1px solid ${DS.border}`, borderRadius: '10px', padding: '9px 16px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: DS.font }}
+              >
+                <FileText size={14} />
+                PDF
+              </button>
+            </div>
+          </motion.div>
+
+          {/* ── Filter Bar ───────────────────────────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            style={{ background: DS.cardBg, border: '1px solid ' + DS.border, borderRadius: '16px', padding: '20px' }}
+          >
+            <p style={{ fontSize: '11px', fontWeight: 600, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 14px' }}>
+              Filter Data
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              {/* Portfolio */}
+              <div>
+                <label style={labelStyle}>Portfolio</label>
+                <Select value={selectedPortfolio} onValueChange={(v) => { setSelectedPortfolio(v); setSelectedProjectKey('All'); setSelectedProjectName('All'); }}>
+                  <SelectTrigger style={selectTriggerStyle}><SelectValue /></SelectTrigger>
+                  <SelectContent style={{ background: DS.surface, border: `1px solid ${DS.border}`, color: DS.textPrimary }}>
+                    {options.portfolios.map(p => <SelectItem key={p} value={p} style={{ color: DS.textPrimary }}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Project Key */}
+              <div>
+                <label style={labelStyle}>Project Key</label>
+                <Select value={selectedProjectKey} onValueChange={setSelectedProjectKey}>
+                  <SelectTrigger style={selectTriggerStyle}><SelectValue /></SelectTrigger>
+                  <SelectContent style={{ background: DS.surface, border: `1px solid ${DS.border}`, color: DS.textPrimary }}>
+                    {options.project_keys.map(k => <SelectItem key={k} value={k} style={{ color: DS.textPrimary }}>{k}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Project Name */}
+              <div>
+                <label style={labelStyle}>Project Name</label>
+                <Select value={selectedProjectName} onValueChange={setSelectedProjectName}>
+                  <SelectTrigger style={selectTriggerStyle}><SelectValue /></SelectTrigger>
+                  <SelectContent style={{ background: DS.surface, border: `1px solid ${DS.border}`, color: DS.textPrimary }}>
+                    {options.project_names.map(n => <SelectItem key={n} value={n} style={{ color: DS.textPrimary }}>{n}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* RCA */}
+              <div>
+                <label style={labelStyle}>
+                  RCA <span style={{ fontSize: '10px', color: DS.textMuted, fontWeight: 400 }}>(Bug &amp; Defect)</span>
+                </label>
+                <Select value={selectedRCA} onValueChange={setSelectedRCA}>
+                  <SelectTrigger style={selectTriggerStyle}><SelectValue /></SelectTrigger>
+                  <SelectContent style={{ background: DS.surface, border: `1px solid ${DS.border}`, color: DS.textPrimary }}>
+                    {options.rca_values.map(r => <SelectItem key={r} value={r} style={{ color: DS.textPrimary }}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* ── Key KPI Gauges — 3-col grid ──────────────────────────────── */}
+          <motion.div
+            key={`gauges-${dataKey}`}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-6 space-y-4"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}
           >
-            <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">AI Insights</h2>
-              {loadingInsights && (
-                <RefreshCw className="h-4 w-4 animate-spin text-slate-500" />
-              )}
-            </div>
-            
-            {loadingInsights ? (
-              <div className="text-sm text-slate-600 dark:text-slate-400">Generating AI insights...</div>
-            ) : aiInsights ? (
-              <>
-                {/* Dynamic Comment */}
-                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Analysis</p>
-                  <p className="text-sm text-slate-900 dark:text-slate-100">{aiInsights.comment}</p>
+            {/* Automation % gauge */}
+            {[
+              { label: 'Automation', sublabel: 'Test Automation Coverage', value: automationPct, color: DS.green, icon: <Zap size={14} /> },
+              { label: 'Completion', sublabel: 'Test Case Completion Rate', value: completionPct, color: DS.blue, icon: <CheckCircle size={14} /> },
+              { label: 'Quality Index', sublabel: 'Defect-free ratio (est.)', value: Math.max(0, 100 - ((totalDefects + totalBugs) / Math.max(data.automation_metrics?.committed_tc_count || 1, 1)) * 100), color: DS.amber, icon: <Award size={14} /> },
+            ].map(({ label, sublabel, value, color, icon }) => (
+              <motion.div
+                key={label}
+                whileHover={{ borderColor: DS.borderStrong }}
+                style={{ background: DS.cardBg, border: `1px solid ${DS.border}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', transition: 'border-color 0.2s', cursor: 'default' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color }}>{icon}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
                 </div>
-                
-                {/* Recommendations */}
-                {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Recommendations to Reduce Leakage</p>
-                    <ul className="space-y-2">
-                      {aiInsights.recommendations.map((rec, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm text-slate-900 dark:text-slate-100">
-                          <span className="text-blue-600 dark:text-blue-400 mt-1">•</span>
-                          <span>{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <GaugeRing value={value} color={color} size={112} />
+                  <div style={{ position: 'absolute', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: DS.textPrimary, letterSpacing: '-0.04em', lineHeight: 1 }}>
+                      {value.toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: DS.textMuted, fontWeight: 500 }}>%</div>
                   </div>
-                )}
-                
-                {/* Prediction */}
-                {aiInsights.prediction && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Future Prediction</p>
-                    <p className="text-sm text-blue-900 dark:text-blue-100">{aiInsights.prediction}</p>
-                  </div>
-                )}
-              </>
-            ) : null}
-          </motion.div>
-        )}
-
-        {/* Summary Metrics Cards */}
-        <motion.div
-          key={`summary-${dataKey}`}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 100, damping: 15 }}
-        >
-          <SummaryCard
-            title="Defects"
-            value={totalDefects}
-            icon={<AlertCircle />}
-            color="#FF6B6B"
-            gradientStart="#FF6B6B"
-            gradientEnd="#FF8E53"
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-          />
-          <SummaryCard
-            title="Bugs"
-            value={totalBugs}
-            icon={<Bug />}
-            color="#FFD93D"
-            gradientStart="#FFD93D"
-            gradientEnd="#FFA500"
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-          />
-          <SummaryCard
-            title="Automation %"
-            value={automationPct}
-            icon={<Zap />}
-            color="#4ECDC4"
-            gradientStart="#4ECDC4"
-            gradientEnd="#6C5CE7"
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-            isPercentage={true}
-          />
-          <SummaryCard
-            title="Completion %"
-            value={completionPct}
-            icon={<CheckCircle />}
-            color="#51CF66"
-            gradientStart="#51CF66"
-            gradientEnd="#20C997"
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-            isPercentage={true}
-          />
-        </motion.div>
-
-        {/* Projects List - Only show when portfolio is selected */}
-        {selectedPortfolio !== 'All' && data?.projects_list?.length > 0 && (
-          <motion.div
-            key={`projects-${dataKey}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, type: "spring", stiffness: 100, damping: 15 }}
-            className="space-y-4"
-          >
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-slate-900 dark:text-slate-100" />
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                Projects ({data.projects_list.length})
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data.projects_list.map((project, index) => (
-                <ProjectCard
-                  key={`${project.project_key}-${index}`}
-                  project={project}
-                  isDarkMode={isDarkMode}
-                  currentTheme={currentTheme}
-                  dataKey={dataKey}
-                  index={index}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Detailed Metrics Section */}
-        <motion.div
-          key={`details-${dataKey}`}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, type: "spring", stiffness: 100, damping: 15 }}
-        >
-          {/* Defect Analysis Panel */}
-          <AnalysisPanel
-            title="Defect Analysis"
-            icon={<AlertCircle />}
-            totalCount={totalDefects}
-            rcaBreakdown={data.defect_rca_breakdown || {}}
-            color="#FF6B6B"
-            gradientStart="#FF6B6B"
-            gradientEnd="#FF8E53"
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-          />
-
-          {/* Bug Analysis Panel */}
-          <AnalysisPanel
-            title="Bug Analysis"
-            icon={<Bug />}
-            totalCount={totalBugs}
-            rcaBreakdown={data.bug_rca_breakdown || {}}
-            color="#FFD93D"
-            gradientStart="#FFD93D"
-            gradientEnd="#FFA500"
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-          />
-        </motion.div>
-
-        {/* Automation Metrics Panel */}
-        <motion.div
-          key={`automation-${dataKey}`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, type: "spring", stiffness: 100, damping: 15 }}
-        >
-          <AutomationPanel
-            automationMetrics={data.automation_metrics || {
-              completion_percentage: 0,
-              automation_percentage: 0,
-              committed_tc_count: 0,
-              completed_tc_count: 0,
-              total_projects: 0
-            }}
-            projectsList={data.projects_list || []}
-            isDarkMode={isDarkMode}
-            currentTheme={currentTheme}
-            dataKey={dataKey}
-          />
-        </motion.div>
-
-        {/* Detailed Information - Show when specific portfolio and project key are selected */}
-        {selectedPortfolio !== 'All' && selectedProjectKey !== 'All' && (
-          <>
-            {/* Defects and Bugs Details - Table Layout */}
-            {(data.defect_details?.length > 0 || data.bug_details?.length > 0) && (
-              <motion.div
-                key={`defects-bugs-details-${dataKey}`}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, type: "spring", stiffness: 120, damping: 20 }}
-                className="space-y-6"
-              >
-                {/* Defect Details Table */}
-                {data.defect_details?.length > 0 && (
-                  <Card className="overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-                    <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-900/40">
-                          <AlertCircle className="h-6 w-6 text-rose-700 dark:text-rose-300" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                            Defect Details
-                          </h3>
-                          <p className="text-sm mt-1 text-slate-600 dark:text-slate-400">
-                            {data.defect_details.length} defect{data.defect_details.length !== 1 ? 's' : ''} found
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Issue Key</th>
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Description</th>
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Assignee</th>
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Justification</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.defect_details.map((defect, index) => (
-                            <motion.tr
-                              key={index}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.7 + index * 0.05, duration: 0.4 }}
-                              className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
-                            >
-                              <td className="px-6 py-4">
-                                <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                                  {defect.issue_key || 'N/A'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <p className="text-sm max-w-md text-slate-900 dark:text-slate-100">
-                                  {defect.summary || 'N/A'}
-                                </p>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100">
-                                    {(defect.assignee_name || 'N/A').charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-sm text-slate-900 dark:text-slate-100">
-                                    {defect.assignee_name || 'N/A'}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <p className="text-sm max-w-md text-slate-600 dark:text-slate-400">
-                                  {aiInsights?.comment || defect.justification || '-'}
-                                </p>
-                              </td>
-                            </motion.tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
-                )}
-
-                {/* Bug Details Table */}
-                {data.bug_details?.length > 0 && (
-                  <Card className="overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-                    <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/40">
-                          <Bug className="h-6 w-6 text-amber-700 dark:text-amber-300" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                            Bug Details
-                          </h3>
-                          <p className="text-sm mt-1 text-slate-600 dark:text-slate-400">
-                            {data.bug_details.length} bug{data.bug_details.length !== 1 ? 's' : ''} found
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Issue Key</th>
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Description</th>
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Assignee</th>
-                            <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Justification</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.bug_details.map((bug, index) => (
-                            <motion.tr
-                              key={index}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.8 + index * 0.05, duration: 0.4 }}
-                              className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
-                            >
-                              <td className="px-6 py-4">
-                                <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                                  {bug.issue_key || 'N/A'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <p className="text-sm max-w-md text-slate-900 dark:text-slate-100">
-                                  {bug.summary || 'N/A'}
-                                </p>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100">
-                                    {(bug.assignee_name || 'N/A').charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-sm text-slate-900 dark:text-slate-100">
-                                    {bug.assignee_name || 'N/A'}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <p className="text-sm max-w-md text-slate-600 dark:text-slate-400">
-                                  {aiInsights?.comment || bug.justification || '-'}
-                                </p>
-                              </td>
-                            </motion.tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
-                )}
+                </div>
+                <p style={{ fontSize: '12px', color: DS.textSecondary, margin: 0, textAlign: 'center' }}>{sublabel}</p>
               </motion.div>
-            )}
+            ))}
+          </motion.div>
 
-            {/* Automation Details Table */}
-            {data.automation_details?.length > 0 && (
-              <motion.div
-                key={`automation-details-${dataKey}`}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9, type: "spring", stiffness: 120, damping: 20 }}
-              >
-                <Card className="overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-                  <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/40">
-                        <Zap className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
+          {/* ── Defect & Bug Count Stats — 4-col grid ────────────────────── */}
+          <motion.div
+            key={`counts-${dataKey}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22 }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}
+          >
+            {[
+              { label: 'Defect Count', value: totalDefects, icon: <AlertCircle size={18} />, accent: DS.red, accentBg: DS.redBg, isNum: true },
+              { label: 'Bug Count', value: totalBugs, icon: <Bug size={18} />, accent: DS.amber, accentBg: DS.amberBg, isNum: true },
+              { label: 'Committed TC', value: data.automation_metrics?.committed_tc_count || 0, icon: <BarChart3 size={18} />, accent: DS.blue, accentBg: DS.blueBg, isNum: true },
+              { label: 'Completed TC', value: data.automation_metrics?.completed_tc_count || 0, icon: <CheckCircle size={18} />, accent: DS.green, accentBg: DS.greenBg, isNum: true },
+            ].map(({ label, value, icon, accent, accentBg }) => (
+              <KPISummaryCard key={label} title={label} value={value as number} icon={icon} accent={accent} accentBg={accentBg} dataKey={dataKey} />
+            ))}
+          </motion.div>
+
+          {/* ── AI Insights ──────────────────────────────────────────────── */}
+          {(aiInsights || loadingInsights) && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28 }}
+              style={{ background: DS.cardBg, border: '1px solid ' + DS.border, borderRadius: '16px', padding: '20px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <Activity size={16} style={{ color: DS.blue }} />
+                <h2 style={{ fontSize: '14px', fontWeight: 700, color: DS.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>AI Insights</h2>
+                {loadingInsights && <RefreshCw size={13} style={{ color: DS.textMuted, animation: 'spin 1s linear infinite' }} />}
+              </div>
+              {loadingInsights ? (
+                <p style={{ fontSize: '13px', color: DS.textSecondary, margin: 0 }}>Generating AI insights…</p>
+              ) : aiInsights ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ background: DS.surface, border: `1px solid ${DS.border}`, borderRadius: '10px', padding: '14px' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 600, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Analysis</p>
+                    <p style={{ fontSize: '13px', color: DS.textPrimary, margin: 0 }}>{aiInsights.comment}</p>
+                  </div>
+                  {aiInsights.recommendations?.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: '10px', fontWeight: 600, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Recommendations</p>
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {aiInsights.recommendations.map((rec, i) => (
+                          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: DS.textPrimary }}>
+                            <span style={{ color: DS.blue, marginTop: '2px', flexShrink: 0 }}>•</span>
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {aiInsights.prediction && (
+                    <div style={{ background: DS.blueBg, border: `1px solid ${DS.blue}30`, borderRadius: '10px', padding: '14px' }}>
+                      <p style={{ fontSize: '10px', fontWeight: 600, color: DS.blue, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Future Prediction</p>
+                      <p style={{ fontSize: '13px', color: DS.textPrimary, margin: 0 }}>{aiInsights.prediction}</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </motion.div>
+          )}
+
+          {/* ── Projects List ────────────────────────────────────────────── */}
+          {selectedPortfolio !== 'All' && data?.projects_list?.length > 0 && (
+            <motion.div
+              key={`projects-${dataKey}`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.32 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <Building2 size={15} style={{ color: DS.textSecondary }} />
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: DS.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>
+                  Projects <span style={{ fontWeight: 400, color: DS.textMuted, fontSize: '13px' }}>({data.projects_list.length})</span>
+                </h2>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+                {data.projects_list.map((project, index) => (
+                  <ProjectCard key={`${project.project_key}-${index}`} project={project} index={index} dataKey={dataKey} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── RCA Breakdown: Defect + Bug Analysis side-by-side ────────── */}
+          {(Object.keys(data.defect_rca_breakdown || {}).length > 0 || Object.keys(data.bug_rca_breakdown || {}).length > 0) && (
+            <motion.div
+              key={`rca-${dataKey}`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.38 }}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}
+            >
+              <AnalysisPanel title="Defect RCA Breakdown" icon={<AlertCircle size={15} />} totalCount={totalDefects} rcaBreakdown={data.defect_rca_breakdown || {}} accent={DS.red} dataKey={dataKey} />
+              <AnalysisPanel title="Bug RCA Breakdown" icon={<Bug size={15} />} totalCount={totalBugs} rcaBreakdown={data.bug_rca_breakdown || {}} accent={DS.amber} dataKey={dataKey} />
+            </motion.div>
+          )}
+
+          {/* ── Automation Metrics Panel ──────────────────────────────────── */}
+          <motion.div
+            key={`automation-${dataKey}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.44 }}
+          >
+            <AutomationPanel
+              automationMetrics={data.automation_metrics || { completion_percentage: 0, automation_percentage: 0, committed_tc_count: 0, completed_tc_count: 0, total_projects: 0 }}
+              projectsList={data.projects_list || []}
+              dataKey={dataKey}
+            />
+          </motion.div>
+
+          {/* ── Detail Tables ─────────────────────────────────────────────── */}
+          {selectedPortfolio !== 'All' && selectedProjectKey !== 'All' && (
+            <>
+              {(data.defect_details?.length > 0 || data.bug_details?.length > 0) && (
+                <motion.div
+                  key={`defects-bugs-details-${dataKey}`}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+                >
+                  {data.defect_details?.length > 0 && (
+                    <DetailTable
+                      title="Defect Details"
+                      subtitle={`${data.defect_details.length} defect${data.defect_details.length !== 1 ? 's' : ''} found`}
+                      icon={<AlertCircle size={18} style={{ color: DS.red }} />}
+                      iconBg={DS.redBg}
+                      rows={data.defect_details}
+                      aiComment={aiInsights?.comment}
+                    />
+                  )}
+                  {data.bug_details?.length > 0 && (
+                    <DetailTable
+                      title="Bug Details"
+                      subtitle={`${data.bug_details.length} bug${data.bug_details.length !== 1 ? 's' : ''} found`}
+                      icon={<Bug size={18} style={{ color: DS.amber }} />}
+                      iconBg={DS.amberBg}
+                      rows={data.bug_details}
+                      aiComment={aiInsights?.comment}
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {/* Automation Details Table */}
+              {data.automation_details?.length > 0 && (
+                <motion.div
+                  key={`automation-details-${dataKey}`}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <div style={{ ...card, overflow: 'hidden' }}>
+                    <div style={{ padding: '20px', borderBottom: `1px solid ${DS.border}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ padding: '8px', borderRadius: '10px', background: DS.greenBg }}>
+                        <Zap size={18} style={{ color: DS.green }} />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                          Automation Details
-                        </h3>
-                        <p className="text-sm mt-1 text-slate-600 dark:text-slate-400">
+                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: DS.textPrimary, margin: 0 }}>Automation Details</h3>
+                        <p style={{ fontSize: '12px', color: DS.textSecondary, margin: '2px 0 0' }}>
                           {data.automation_details.length} project{data.automation_details.length !== 1 ? 's' : ''} found
                         </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Project</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Project Type</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Tool/Framework</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">AI Integration</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">AI Usage Level</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">Productivity Impact</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">AI Inference</th>
-                          <th className="px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100">QA Owner</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.automation_details.map((automation, index) => (
-                          <motion.tr
-                            key={index}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 1.0 + index * 0.05, duration: 0.4 }}
-                            className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
-                          >
-                            <td className="px-6 py-4">
-                              <div>
-                                <p className="font-bold text-sm mb-1 text-slate-900 dark:text-slate-100">
-                                  {automation.project_key}
-                                </p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400">
-                                  {automation.project_name}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <Badge variant="outline" className="text-xs border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">
-                                {automation.project_type || 'N/A'}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm text-slate-900 dark:text-slate-100">
-                                {automation.tool_framework || 'N/A'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <Badge 
-                                variant={automation.ai_assistant_integration_enabled?.toLowerCase() === 'yes' ? 'default' : 'outline'}
-                                className={`text-xs ${
-                                  automation.ai_assistant_integration_enabled?.toLowerCase() === 'yes' 
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700' 
-                                    : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300'
-                                }`}
-                              >
-                                {automation.ai_assistant_integration_enabled || 'N/A'}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm text-slate-900 dark:text-slate-100">
-                                {automation.usage_level_of_ai_assistant || 'N/A'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm text-slate-900 dark:text-slate-100">
-                                {automation.impact_on_productivity || 'N/A'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm max-w-xs truncate block text-slate-600 dark:text-slate-400">
-                                {automation.ai_usage_inference || 'N/A'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100">
-                                  {(automation.qa_owner || 'N/A').charAt(0).toUpperCase()}
-                                </div>
-                                <span className="text-sm text-slate-900 dark:text-slate-100">
-                                  {automation.qa_owner || 'N/A'}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: DS.surface, borderBottom: `1px solid ${DS.border}` }}>
+                            {['Project', 'Type', 'Tool/Framework', 'AI Integration', 'AI Usage Level', 'Productivity Impact', 'AI Inference', 'QA Owner'].map(h => (
+                              <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.automation_details.map((automation, index) => (
+                            <tr
+                              key={index}
+                              style={{ borderBottom: `1px solid ${DS.border}` }}
+                              onMouseEnter={e => (e.currentTarget.style.background = DS.surface)}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <td style={{ padding: '12px 16px' }}>
+                                <p style={{ fontWeight: 600, fontSize: '13px', color: DS.textPrimary, margin: 0 }}>{automation.project_key}</p>
+                                <p style={{ fontSize: '11px', color: DS.textSecondary, margin: '2px 0 0' }}>{automation.project_name}</p>
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <span style={{ background: DS.surface, color: DS.textSecondary, border: `1px solid ${DS.border}`, borderRadius: '5px', padding: '2px 8px', fontSize: '11px' }}>
+                                  {automation.project_type || 'N/A'}
                                 </span>
-                              </div>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: DS.textPrimary }}>{automation.tool_framework || 'N/A'}</td>
+                              <td style={{ padding: '12px 16px' }}>
+                                {automation.ai_assistant_integration_enabled?.toLowerCase() === 'yes' ? (
+                                  <span style={{ background: DS.greenBg, color: DS.green, borderRadius: '5px', padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}>Yes</span>
+                                ) : (
+                                  <span style={{ background: DS.surface, color: DS.textSecondary, borderRadius: '5px', padding: '2px 8px', fontSize: '11px' }}>{automation.ai_assistant_integration_enabled || 'N/A'}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: DS.textPrimary }}>{automation.usage_level_of_ai_assistant || 'N/A'}</td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: DS.textPrimary }}>{automation.impact_on_productivity || 'N/A'}</td>
+                              <td style={{ padding: '12px 16px', fontSize: '12px', color: DS.textSecondary, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{automation.ai_usage_inference || 'N/A'}</td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: DS.surface, border: `1px solid ${DS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: DS.textPrimary }}>
+                                    {(automation.qa_owner || 'N').charAt(0).toUpperCase()}
+                                  </div>
+                                  <span style={{ fontSize: '13px', color: DS.textPrimary }}>{automation.qa_owner || 'N/A'}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </Card>
-              </motion.div>
-            )}
-          </>
-        )}
+                </motion.div>
+              )}
+            </>
+          )}
+
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
 
-// Summary Card Component
-interface SummaryCardProps {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  color: string;
-  gradientStart: string;
-  gradientEnd: string;
-  isDarkMode: boolean;
-  currentTheme: any;
-  dataKey: number;
-  isPercentage?: boolean;
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const SummaryCard: React.FC<SummaryCardProps> = ({
-  title,
-  value,
-  icon,
-  color,
-  gradientStart,
-  gradientEnd,
-  isDarkMode,
-  currentTheme,
-  dataKey,
-  isPercentage = false
-}) => {
-  const [displayValue, setDisplayValue] = React.useState(0);
-
+function KPISummaryCard({ title, value, icon, accent, accentBg, dataKey, isPercentage = false }: {
+  title: string; value: number; icon: React.ReactNode;
+  accent: string; accentBg: string; dataKey: number; isPercentage?: boolean;
+}) {
+  const [display, setDisplay] = React.useState(0);
   React.useEffect(() => {
-    const duration = 1500;
-    const startTime = Date.now();
-    const startValue = displayValue;
-    const endValue = value;
-
+    const duration = 1200;
+    const start = Date.now();
     const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Easing function for smooth animation
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      const currentValue = startValue + (endValue - startValue) * easeOutQuart;
-      
-      setDisplayValue(isPercentage ? currentValue : Math.floor(currentValue));
-      
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        setDisplayValue(endValue);
-      }
+      const p = Math.min((Date.now() - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 4);
+      setDisplay(isPercentage ? value * ease : Math.floor(value * ease));
+      if (p < 1) requestAnimationFrame(animate);
+      else setDisplay(value);
     };
-
     animate();
   }, [value, dataKey, isPercentage]);
 
   return (
     <motion.div
-      key={`summary-card-${title}-${dataKey}`}
-      initial={{ opacity: 0, scale: 0.8, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ 
-        duration: 0.6, 
-        type: "spring",
-        stiffness: 200,
-        damping: 20
-      }}
-      whileHover={{ scale: 1.02, y: -2 }}
-      className="relative"
+      key={`kpi-${title}-${dataKey}`}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ borderColor: DS.borderStrong }}
+      style={{ background: DS.cardBg, border: `1px solid ${DS.border}`, borderRadius: '12px', padding: '20px', transition: 'border-color 0.2s', cursor: 'default' }}
     >
-      <Card 
-        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm relative overflow-hidden"
-      >
-        {/* Gradient overlay */}
-        <div 
-          className="absolute inset-0 opacity-10"
-          style={{
-            background: `linear-gradient(135deg, ${gradientStart}, ${gradientEnd})`
-          }}
-        />
-        
-        <CardHeader className="relative z-10 pb-2">
-          <CardTitle 
-            className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100"
-          >
-            <span style={{ color: color }}>{icon}</span>
-            {title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="relative z-10 pt-2">
-          <motion.div 
-            className="text-5xl font-black text-slate-900 dark:text-slate-100"
-          >
-            {isPercentage ? `${displayValue.toFixed(1)}%` : displayValue.toLocaleString()}
-          </motion.div>
-        </CardContent>
-      </Card>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+        <span style={{ color: accent }}>{icon}</span>
+        <span style={{ fontSize: '11px', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 500 }}>{title}</span>
+      </div>
+      <div style={{ fontSize: '28px', fontWeight: 600, color: DS.textPrimary, letterSpacing: '-0.04em', fontFamily: DS.font }}>
+        {isPercentage ? `${display.toFixed(1)}%` : display.toLocaleString()}
+      </div>
     </motion.div>
   );
-};
-
-// Project Card Component
-interface ProjectCardProps {
-  project: {
-    project_key: string;
-    project_name: string;
-    defect_count: number;
-    bug_count: number;
-    automation_percentage: number;
-    completion_percentage: number;
-  };
-  isDarkMode: boolean;
-  currentTheme: any;
-  dataKey: number;
-  index: number;
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({
-  project,
-  isDarkMode,
-  currentTheme,
-  dataKey,
-  index
-}) => {
+function ProjectCard({ project, index, dataKey }: {
+  project: { project_key: string; project_name: string; defect_count: number; bug_count: number; automation_percentage: number; completion_percentage: number; };
+  index: number; dataKey: number;
+}) {
   return (
     <motion.div
-      key={`project-${project.project_key}-${dataKey}`}
-      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ 
-        delay: 0.3 + index * 0.1, 
-        type: "spring", 
-        stiffness: 200, 
-        damping: 20 
-      }}
-      whileHover={{ scale: 1.02, y: -5 }}
+      key={`proj-${project.project_key}-${dataKey}`}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 + index * 0.08 }}
+      style={{ background: DS.cardBg, border: `1px solid ${DS.border}`, borderRadius: '12px', padding: '16px', transition: 'border-color 0.2s' }}
+      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = DS.borderStrong)}
+      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = DS.border)}
     >
-      <Card 
-        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm"
-      >
-        <CardHeader>
-          <CardTitle 
-            className="flex items-center gap-2 text-slate-900 dark:text-slate-100"
-          >
-            <Code className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-            <div>
-              <div className="font-bold">{project.project_key}</div>
-              <div className="text-sm font-normal text-slate-600 dark:text-slate-400">
-                {project.project_name}
-              </div>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Defects</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {project.defect_count}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Bugs</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {project.bug_count}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Automation</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {project.automation_percentage.toFixed(1)}%
-              </div>
-            </div>
-            <div>
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Completion</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {project.completion_percentage.toFixed(1)}%
-              </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <Code size={14} style={{ color: DS.textSecondary }} />
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: DS.textPrimary }}>{project.project_key}</div>
+          <div style={{ fontSize: '11px', color: DS.textSecondary }}>{project.project_name}</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        {[
+          { label: 'Defects', val: project.defect_count, isNum: true },
+          { label: 'Bugs', val: project.bug_count, isNum: true },
+          { label: 'Automation', val: project.automation_percentage, isNum: false },
+          { label: 'Completion', val: project.completion_percentage, isNum: false },
+        ].map(({ label, val, isNum }) => (
+          <div key={label}>
+            <div style={{ fontSize: '11px', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>{label}</div>
+            <div style={{ fontSize: '20px', fontWeight: 600, color: DS.textPrimary, letterSpacing: '-0.03em' }}>
+              {isNum ? val : `${(val as number).toFixed(1)}%`}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        ))}
+      </div>
     </motion.div>
   );
-};
-
-// Analysis Panel Component (for Defects and Bugs)
-interface AnalysisPanelProps {
-  title: string;
-  icon: React.ReactNode;
-  totalCount: number;
-  rcaBreakdown: Record<string, number>;
-  color: string;
-  gradientStart: string;
-  gradientEnd: string;
-  isDarkMode: boolean;
-  currentTheme: any;
-  dataKey: number;
 }
 
-const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
-  title,
-  icon,
-  totalCount,
-  rcaBreakdown,
-  color,
-  gradientStart,
-  gradientEnd,
-  isDarkMode,
-  currentTheme,
-  dataKey
-}) => {
-  const rcaEntries = Object.entries(rcaBreakdown).sort((a, b) => b[1] - a[1]);
-  const maxCount = Math.max(...rcaEntries.map(([_, count]) => count), 1);
+function AnalysisPanel({ title, icon, totalCount, rcaBreakdown, accent, dataKey }: {
+  title: string; icon: React.ReactNode; totalCount: number;
+  rcaBreakdown: Record<string, number>; accent: string; dataKey: number;
+}) {
+  const entries = Object.entries(rcaBreakdown).sort((a, b) => b[1] - a[1]);
+  const maxCount = Math.max(...entries.map(([, c]) => c), 1);
 
   return (
     <motion.div
       key={`panel-${title}-${dataKey}`}
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ 
-        duration: 0.8, 
-        ease: [0.34, 1.56, 0.64, 1],
-        type: "spring",
-        stiffness: 200,
-        damping: 20
-      }}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ background: DS.cardBg, border: `1px solid ${DS.border}`, borderRadius: '12px', padding: '20px', transition: 'border-color 0.2s' }}
+      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = DS.borderStrong)}
+      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = DS.border)}
     >
-      <Card 
-        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm relative overflow-hidden"
-      >
-        <CardHeader className="relative z-10">
-          <CardTitle 
-            className="flex items-center justify-between text-slate-900 dark:text-slate-100"
-          >
-            <div className="flex items-center gap-2">
-              {icon}
-              <span>{title}</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              Total: {totalCount}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="relative z-10 space-y-4">
-          <div className="text-sm font-semibold mb-3 text-slate-600 dark:text-slate-400">
-            Breakdown by RCA:
-          </div>
-          {rcaEntries.length > 0 ? (
-            rcaEntries.map(([rca, count], index) => {
-              const percentage = (count / totalCount) * 100;
-              const barWidth = (count / maxCount) * 100;
-              
-              return (
-                <motion.div
-                  key={rca}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 + index * 0.1 }}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-900 dark:text-slate-100">{rca}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-slate-100">
-                        {count}
-                      </span>
-                      <span className="text-slate-600 dark:text-slate-400">
-                        ({percentage.toFixed(1)}%)
-                      </span>
-                    </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: accent }}>{icon}</span>
+          <span style={{ fontSize: '15px', fontWeight: 600, color: DS.textPrimary }}>{title}</span>
+        </div>
+        <span style={{ fontSize: '14px', fontWeight: 600, color: DS.textSecondary }}>Total: {totalCount}</span>
+      </div>
+      <p style={{ fontSize: '11px', fontWeight: 600, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Breakdown by RCA</p>
+      {entries.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {entries.map(([rca, count], i) => {
+            const pct = totalCount > 0 ? (count / totalCount) * 100 : 0;
+            const barW = (count / maxCount) * 100;
+            return (
+              <motion.div
+                key={rca}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 + i * 0.08 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px' }}>
+                  <span style={{ color: DS.textPrimary }}>{rca}</span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <span style={{ fontWeight: 700, color: DS.textPrimary }}>{count}</span>
+                    <span style={{ color: DS.textMuted }}>({pct.toFixed(1)}%)</span>
                   </div>
-                  <div 
-                    className="h-3 rounded-full overflow-hidden relative"
-                    style={{ 
-                      backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <motion.div
-                      className="h-full rounded-full relative overflow-hidden"
-                      style={{
-                        background: `linear-gradient(90deg, ${gradientStart}, ${gradientEnd})`,
-                        boxShadow: `0 0 10px ${color}60`
-                      }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${barWidth}%` }}
-                      transition={{ duration: 1.5, ease: "easeOut", delay: 0.6 + index * 0.1 }}
-                    >
-                      <motion.div
-                        className="absolute inset-0"
-                        style={{
-                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)'
-                        }}
-                        animate={{
-                          x: ['-100%', '200%']
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "linear",
-                          repeatDelay: 1
-                        }}
-                      />
-                    </motion.div>
-                  </div>
-                </motion.div>
-              );
-            })
-          ) : (
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              No RCA data available
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+                <div style={{ height: '5px', background: DS.surface, border: `1px solid ${DS.border}`, borderRadius: '4px', overflow: 'hidden' }}>
+                  <motion.div
+                    style={{ height: '100%', background: accent, borderRadius: '4px' }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${barW}%` }}
+                    transition={{ duration: 1.2, ease: 'easeOut', delay: 0.5 + i * 0.08 }}
+                  />
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
+        <p style={{ fontSize: '13px', color: DS.textMuted }}>No RCA data available</p>
+      )}
     </motion.div>
   );
-};
-
-// Automation Panel Component
-interface AutomationPanelProps {
-  automationMetrics: {
-    completion_percentage: number;
-    automation_percentage: number;
-    committed_tc_count: number;
-    completed_tc_count: number;
-    total_projects: number;
-  };
-  projectsList: Array<{
-    project_key: string;
-    project_name: string;
-    automation_percentage: number;
-    completion_percentage: number;
-  }>;
-  isDarkMode: boolean;
-  currentTheme: any;
-  dataKey: number;
 }
 
-const AutomationPanel: React.FC<AutomationPanelProps> = ({
-  automationMetrics,
-  projectsList,
-  isDarkMode,
-  currentTheme,
-  dataKey
-}) => {
+function AutomationPanel({ automationMetrics, projectsList, dataKey }: {
+  automationMetrics: { completion_percentage: number; automation_percentage: number; committed_tc_count: number; completed_tc_count: number; total_projects: number; };
+  projectsList: Array<{ project_key: string; project_name: string; automation_percentage: number; completion_percentage: number; }>;
+  dataKey: number;
+}) {
   return (
     <motion.div
-      key={`automation-panel-${dataKey}`}
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ 
-        duration: 0.8, 
-        ease: [0.34, 1.56, 0.64, 1],
-        type: "spring",
-        stiffness: 200,
-        damping: 20
-      }}
+      key={`auto-panel-${dataKey}`}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ background: DS.cardBg, border: `1px solid ${DS.border}`, borderRadius: '12px', padding: '20px', transition: 'border-color 0.2s' }}
+      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = DS.borderStrong)}
+      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = DS.border)}
     >
-      <Card 
-        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm relative overflow-hidden"
-      >
-        <CardHeader className="relative z-10">
-          <CardTitle 
-            className="flex items-center gap-2 text-slate-900 dark:text-slate-100"
-          >
-            <Zap className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-            Automation Metrics
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="relative z-10 space-y-6">
-          {/* Overall Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Committed TC</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {automationMetrics.committed_tc_count}
-              </div>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Completed TC</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {automationMetrics.completed_tc_count}
-              </div>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Automation %</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {automationMetrics.automation_percentage.toFixed(1)}%
-              </div>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-              <div className="text-xs mb-1 text-slate-600 dark:text-slate-400">Completion %</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {automationMetrics.completion_percentage.toFixed(1)}%
-              </div>
-            </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+        <Zap size={15} style={{ color: DS.green }} />
+        <span style={{ fontSize: '15px', fontWeight: 600, color: DS.textPrimary }}>Automation Metrics</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+        {[
+          { label: 'Committed TC', val: automationMetrics.committed_tc_count },
+          { label: 'Completed TC', val: automationMetrics.completed_tc_count },
+          { label: 'Automation %', val: `${automationMetrics.automation_percentage.toFixed(1)}%` },
+          { label: 'Completion %', val: `${automationMetrics.completion_percentage.toFixed(1)}%` },
+        ].map(({ label, val }) => (
+          <div key={label} style={{ background: DS.surface, border: `1px solid ${DS.border}`, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>{label}</div>
+            <div style={{ fontSize: '20px', fontWeight: 600, color: DS.textPrimary, letterSpacing: '-0.03em' }}>{val}</div>
           </div>
-
-          {/* Projects Breakdown */}
-          {projectsList.length > 0 && (
-            <div className="space-y-4">
-              <div className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-                Projects Breakdown:
-              </div>
-              {projectsList.map((project, index) => {
-                const completionWidth = project.completion_percentage || 0;
-                
-                return (
+        ))}
+      </div>
+      {projectsList.length > 0 && (
+        <div>
+          <p style={{ fontSize: '11px', fontWeight: 600, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Projects Breakdown</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {projectsList.map((project, i) => (
+              <motion.div
+                key={`auto-proj-${project.project_key}-${i}`}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5 + i * 0.08 }}
+                style={{ background: DS.surface, border: `1px solid ${DS.border}`, borderRadius: '8px', padding: '12px' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: DS.textPrimary }}>{project.project_key} — {project.project_name}</div>
+                    <div style={{ fontSize: '11px', color: DS.textSecondary, marginTop: '2px' }}>
+                      Automation: {project.automation_percentage.toFixed(1)}% | Completion: {project.completion_percentage.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+                <div style={{ height: '5px', background: DS.border, border: `1px solid ${DS.border}`, borderRadius: '4px', overflow: 'hidden' }}>
                   <motion.div
-                    key={`automation-project-${project.project_key}-${index}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.6 + index * 0.1 }}
-                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">
-                          {project.project_key} - {project.project_name}
-                        </div>
-                        <div className="text-xs text-slate-600 dark:text-slate-400">
-                          Automation: {project.automation_percentage.toFixed(1)}% | Completion: {project.completion_percentage.toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-                    <div 
-                      className="h-2 rounded-full overflow-hidden relative"
-                      style={{ 
-                        backgroundColor: isDarkMode ? '#4B5563' : '#E5E7EB',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <motion.div
-                        className="h-full rounded-full relative overflow-hidden"
-                        style={{
-                          background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`,
-                          boxShadow: `0 0 10px ${currentTheme.colors.primary}60`
-                        }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${completionWidth}%` }}
-                        transition={{ duration: 1.5, ease: "easeOut", delay: 0.7 + index * 0.1 }}
-                      >
-                        <motion.div
-                          className="absolute inset-0"
-                          style={{
-                            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)'
-                          }}
-                          animate={{
-                            x: ['-100%', '200%']
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "linear",
-                            repeatDelay: 1
-                          }}
-                        />
-                      </motion.div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    style={{ height: '100%', background: DS.green, borderRadius: '4px' }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${project.completion_percentage}%` }}
+                    transition={{ duration: 1.2, ease: 'easeOut', delay: 0.6 + i * 0.08 }}
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
-};
+}
+
+function DetailTable({ title, subtitle, icon, iconBg, rows, aiComment }: {
+  title: string; subtitle: string; icon: React.ReactNode; iconBg: string;
+  rows: Array<{ issue_key: string; summary: string; assignee_name: string; justification?: string; }>;
+  aiComment?: string;
+}) {
+  return (
+    <div style={{ ...card, overflow: 'hidden' }}>
+      <div style={{ padding: '20px', borderBottom: `1px solid ${DS.border}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ padding: '8px', borderRadius: '8px', background: iconBg }}>{icon}</div>
+        <div>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: DS.textPrimary, margin: 0 }}>{title}</h3>
+          <p style={{ fontSize: '12px', color: DS.textSecondary, margin: '2px 0 0' }}>{subtitle}</p>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: DS.surface, borderBottom: `1px solid ${DS.border}` }}>
+              {['Issue Key', 'Description', 'Assignee', 'Justification'].map(h => (
+                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr
+                key={i}
+                style={{ borderBottom: `1px solid ${DS.border}` }}
+                onMouseEnter={e => (e.currentTarget.style.background = DS.surface)}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <td style={{ padding: '12px 16px' }}>
+                  <span style={{ fontFamily: DS.mono, fontSize: '12px', fontWeight: 700, color: DS.textPrimary }}>{row.issue_key || 'N/A'}</span>
+                </td>
+                <td style={{ padding: '12px 16px', fontSize: '13px', color: DS.textPrimary, maxWidth: '320px' }}>{row.summary || 'N/A'}</td>
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: DS.surface, border: `1px solid ${DS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: DS.textPrimary, flexShrink: 0 }}>
+                      {(row.assignee_name || 'N').charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: '13px', color: DS.textPrimary }}>{row.assignee_name || 'N/A'}</span>
+                  </div>
+                </td>
+                <td style={{ padding: '12px 16px', fontSize: '12px', color: DS.textSecondary, maxWidth: '240px' }}>
+                  {aiComment || row.justification || '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

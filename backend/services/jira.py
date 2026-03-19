@@ -443,6 +443,75 @@ class JiraClient:
             logger.error(f"LDAP user search failed: {e}")
             return []
     
+    async def get_sprint_history(self, board_id: int, limit: int = 6) -> List[Dict[str, Any]]:
+        """Get sprint history with velocity data from Jira Agile API.
+        Uses /rest/agile/1.0/board/{boardId}/sprint to fetch closed + active sprints,
+        then /rest/agile/1.0/sprint/{sprintId}/issue for story point totals.
+        """
+        try:
+            if not self._client:
+                await self.initialize()
+
+            # Fetch recent closed + active sprints from the Agile API
+            sprints_url = self._url(f"/rest/agile/1.0/board/{board_id}/sprint")
+            resp = await self._get_with_auth(
+                sprints_url,
+                params={"state": "closed,active", "maxResults": limit + 2},
+            )
+            if resp.status_code != 200:
+                logger.warning(f"Agile sprint API returned {resp.status_code}: {resp.text[:200]}")
+                return []
+
+            sprints = resp.json().get("values", [])
+            # Chronological order — take the most recent `limit` sprints
+            sprints = sorted(sprints, key=lambda s: s.get("startDate") or "", reverse=True)[:limit]
+            sprints.reverse()
+
+            done_statuses = {"done", "resolved", "closed", "complete", "completed"}
+            result: List[Dict[str, Any]] = []
+
+            for sprint in sprints:
+                sprint_id = sprint.get("id")
+                sprint_name = sprint.get("name", f"Sprint {sprint_id}")
+                start_date = (sprint.get("startDate") or "")[:10]
+                end_date   = (sprint.get("endDate")   or "")[:10]
+
+                # Fetch issues in this sprint to tally story points
+                issues_url = self._url(f"/rest/agile/1.0/sprint/{sprint_id}/issue")
+                i_resp = await self._get_with_auth(
+                    issues_url,
+                    params={"fields": "customfield_10016,status", "maxResults": 500},
+                )
+                if i_resp.status_code != 200:
+                    continue
+
+                issues = i_resp.json().get("issues", [])
+                committed = 0.0
+                completed = 0.0
+                for issue in issues:
+                    points = issue.get("fields", {}).get("customfield_10016") or 0
+                    status_name = (
+                        issue.get("fields", {}).get("status", {}).get("name") or ""
+                    ).lower()
+                    committed += points
+                    if status_name in done_statuses:
+                        completed += points
+
+                result.append({
+                    "sprintName": sprint_name,
+                    "startDate": start_date,
+                    "endDate": end_date,
+                    "committedPoints": round(committed),
+                    "completedPoints": round(completed),
+                    "velocity": round(completed),
+                    "sprintGoal": sprint.get("goal", "") or "",
+                })
+
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get sprint history for board {board_id}: {e}")
+            return []
+
     async def close(self):
         """Close the HTTP client"""
         if self._client:

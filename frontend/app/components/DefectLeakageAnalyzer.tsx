@@ -18,6 +18,7 @@ import { getApiUrl } from '../../lib/api-config';
 import { useTheme } from '../contexts/ThemeContext';
 import { exportTcoeReportAsPDF, exportTcoeReportAsExcel, exportTcoeReportAsExcelMulti } from '../utils/exportUtils';
 import { jobTracker } from '../utils/jobTracker';
+import { DashboardLayout } from './DashboardLayout';
 
 interface WeekMetrics {
   bugs_count: number;
@@ -2808,20 +2809,20 @@ export function DefectLeakageAnalyzer() {
     }
   };
 
-  // Color palette from design
+  // Color palette from theme
   const colorPalette = {
     positive: {
-      icon: '#718539',      // green.600
-      background: '#E8F0D1' // green.50
+      icon: currentTheme.colors.success,
+      background: `${currentTheme.colors.success}20`
     },
     warning: {
-      icon: '#E5B176',      // peach.500
-      text: '#C77F2E',      // peach.600
-      background: '#FEF3C7' // amber.50
+      icon: currentTheme.colors.warning,
+      text: currentTheme.colors.warning,
+      background: `${currentTheme.colors.warning}25`
     },
     negative: {
-      icon: '#A33030',      // red.600
-      background: '#F6EAEA' // red.50
+      icon: currentTheme.colors.error,
+      background: `${currentTheme.colors.error}20`
     }
   };
 
@@ -2832,79 +2833,76 @@ export function DefectLeakageAnalyzer() {
       if (change < -2) return { icon: TrendingDown, color: colorPalette.positive.icon, label: 'Good' };
       if (change > 10) return { icon: TrendingUp, color: colorPalette.negative.icon, label: 'Bad' };
       if (change > 2) return { icon: TrendingUp, color: colorPalette.warning.icon, label: 'Warning' };
-      if (Math.abs(change) <= 2) return { icon: Equal, color: '#9CA3AF', label: 'Equal' };
-      return { icon: Minus, color: '#9CA3AF', label: 'Neutral' };
+      if (Math.abs(change) <= 2) return { icon: Equal, color: currentTheme.colors.textSecondary, label: 'Equal' };
+      return { icon: Minus, color: currentTheme.colors.textSecondary, label: 'Neutral' };
     }
     
     if (leakage >= 60) return { icon: AlertTriangle, color: colorPalette.negative.icon, label: 'Bad' };
     if (leakage >= 40) return { icon: AlertTriangle, color: colorPalette.warning.icon, label: 'Warning' };
     if (leakage <= 10) return { icon: Check, color: colorPalette.positive.icon, label: 'Great' };
     if (leakage <= 25) return { icon: Check, color: colorPalette.positive.icon, label: 'Good' };
-    return { icon: Minus, color: '#9CA3AF', label: 'Neutral' };
+    return { icon: Minus, color: currentTheme.colors.textSecondary, label: 'Neutral' };
   };
 
-  const cardBackground = isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#FFFFFF';
-  const borderColor = isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(226, 232, 240, 1)';
-  const headingColor = isDarkMode ? '#F1F5F9' : '#0F172A';
-  const subheadingColor = isDarkMode ? '#94A3B8' : '#64748B';
-  const tableHeaderBg = isDarkMode ? 'rgba(148, 163, 184, 0.12)' : '#F3F4F6';
-  const tableHeaderText = isDarkMode ? '#E2E8F0' : '#1F2937';
-  const tableBorderColor = isDarkMode ? 'rgba(148, 163, 184, 0.3)' : borderColor;
-  const pdfContainerBg = isDarkMode ? currentTheme.colors.background : '#ffffff';
-  const pdfHeaderBg = isDarkMode ? 'rgba(148, 163, 184, 0.16)' : '#F3F4F6';
-  const pdfHeaderText = isDarkMode ? '#E2E8F0' : '#1F2937';
-  const pdfGrandTotalBg = isDarkMode ? 'rgba(15, 23, 42, 0.9)' : '#1E293B';
-  const pdfGrandTotalText = isDarkMode ? '#E2E8F0' : '#F8FAFC';
+  const cardBackground = currentTheme.colors.surface;
+  const borderColor = `${currentTheme.colors.border}80`;
+  const headingColor = currentTheme.colors.text;
+  const subheadingColor = currentTheme.colors.textSecondary;
+  const tableHeaderBg = `${currentTheme.colors.primary}15`;
+  const tableHeaderText = currentTheme.colors.text;
+  const tableBorderColor = `${currentTheme.colors.border}99`;
+  const pdfContainerBg = currentTheme.colors.background;
+  const pdfHeaderBg = `${currentTheme.colors.primary}20`;
+  const pdfHeaderText = currentTheme.colors.text;
+  const pdfGrandTotalBg = currentTheme.colors.primary;
+  const pdfGrandTotalText = '#FFFFFF';
 
   return (
-    <div
-      className="h-full overflow-auto transition-all duration-300"
-      style={{ 
-        background: isDarkMode 
-          ? `linear-gradient(135deg, ${currentTheme.colors.background} 0%, ${currentTheme.colors.surface} 50%, ${currentTheme.colors.background} 100%)`
-          : `linear-gradient(135deg, ${currentTheme.colors.background} 0%, ${currentTheme.colors.surface || '#F1F5F9'} 50%, ${currentTheme.colors.background} 100%)`
-        ,
-        color: headingColor
-      }}
-    >
-      <div className="p-6 space-y-8 w-full">
-        {/* Header with Gradient */}
+    <DashboardLayout className="transition-all duration-300">
+      <div className="flex-1 min-h-0 p-6 space-y-8 w-full pb-8 overflow-auto">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 
-              className="text-4xl font-bold tracking-tight"
+            <p style={{ color: 'var(--accent-cool)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+              QA Centre of Excellence
+            </p>
+            <h1
               style={{
-                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                background: `linear-gradient(135deg, ${currentTheme.colors.primary} 0%, ${currentTheme.colors.secondary || currentTheme.colors.primary} 50%, ${currentTheme.colors.primary} 100%)`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                color: 'transparent',
-                transition: 'background 0.3s ease'
+                fontFamily: 'var(--font)',
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+                color: 'var(--text-primary)',
               }}
             >
-              CDK QCOE METRICS
+              CDK QCOE Metrics
             </h1>
             {(useMultiSelect && selectedProjectKeys.length > 0) && (
               <div className="mt-2">
-                <Badge 
-                  className="bg-blue-600 dark:bg-blue-500 text-white border-0 px-3 py-1 rounded-lg shadow-sm"
+                <span
                   style={{
-                    backgroundColor: currentTheme.colors.primary
+                    display: 'inline-flex', alignItems: 'center',
+                    fontSize: 11, fontWeight: 600,
+                    color: 'var(--accent-cool)',
+                    backgroundColor: 'var(--accent-cool-bg)',
+                    border: '1px solid rgba(212,168,71,0.25)',
+                    borderRadius: 6, padding: '2px 8px',
                   }}
                 >
                   {selectedProjectKeys.length} Projects Selected
-                </Badge>
+                </span>
               </div>
             )}
           </div>
           <div className="flex gap-3">
             <Button
               onClick={analyzeLeakage}
-              className="flex items-center gap-2 text-white rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition-all duration-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2"
+              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-opacity duration-150 hover:opacity-85 focus-visible:outline-none"
               style={{
-                backgroundColor: currentTheme.colors.primary,
-                borderRadius: '12px'
+                backgroundColor: 'var(--accent-cool)',
+                color: 'var(--bg-page)',
+                borderRadius: '12px',
+                border: 'none',
               }}
               disabled={loading}
             >
@@ -2913,7 +2911,7 @@ export function DefectLeakageAnalyzer() {
             </Button>
             <Button
               onClick={handleExportExcel}
-              className="rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition-all duration-200"
+              className="rounded-xl px-4 py-2 text-sm font-medium transition-opacity duration-150 hover:opacity-85"
               style={{
                 backgroundColor: cardBackground,
                 color: headingColor,
@@ -2929,7 +2927,7 @@ export function DefectLeakageAnalyzer() {
             </Button>
             <Button
               onClick={handleExportPDF}
-              className="rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition-all duration-200"
+              className="rounded-xl px-4 py-2 text-sm font-medium transition-opacity duration-150 hover:opacity-85"
               style={{
                 backgroundColor: cardBackground,
                 color: headingColor,
@@ -2967,7 +2965,7 @@ export function DefectLeakageAnalyzer() {
                 style={{
                   background: isDarkMode 
                     ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(51, 65, 85, 0.8))'
-                    : 'linear-gradient(135deg, #FFFFFF, #F8FAFC)',
+                    : `linear-gradient(135deg, ${currentTheme.colors.surface}, ${currentTheme.colors.background})`,
                   borderColor: portfolioMultiSelectOpen ? currentTheme.colors.primary : borderColor,
                   color: headingColor,
                   borderRadius: '12px',
@@ -3022,14 +3020,14 @@ export function DefectLeakageAnalyzer() {
                   <span className="text-sm font-semibold" style={{ color: headingColor }}>Select Portfolios</span>
                   <div className="flex gap-1">
                     <button 
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                      className="text-xs px-2 py-1 rounded-lg transition-all duration-200 hover:bg-[var(--accent-primary)]/10"
                       onClick={(e) => { e.stopPropagation(); selectAllPortfolios(); }}
                       style={{ color: currentTheme.colors.primary, borderRadius: '8px' }}
                     >
                       All
                     </button>
                     <button 
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                      className="text-xs px-2 py-1 rounded-lg transition-all duration-200 hover:bg-[var(--accent-primary)]/10"
                       onClick={(e) => { e.stopPropagation(); setTempSelectedPortfolios([]); }}
                       style={{ color: currentTheme.colors.textSecondary, borderRadius: '8px' }}
                     >
@@ -3121,7 +3119,7 @@ export function DefectLeakageAnalyzer() {
                 style={{
                   background: isDarkMode 
                     ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(51, 65, 85, 0.8))'
-                    : 'linear-gradient(135deg, #FFFFFF, #F8FAFC)',
+                    : `linear-gradient(135deg, ${currentTheme.colors.surface}, ${currentTheme.colors.background})`,
                   borderColor: multiSelectOpen ? currentTheme.colors.primary : borderColor,
                   color: headingColor,
                   borderRadius: '12px',
@@ -3182,14 +3180,14 @@ export function DefectLeakageAnalyzer() {
                   <span className="text-sm font-semibold" style={{ color: headingColor }}>Select Project Keys</span>
                   <div className="flex gap-1">
                     <button 
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                      className="text-xs px-2 py-1 rounded-lg transition-all duration-200 hover:bg-[var(--accent-primary)]/10"
                       onClick={(e) => { e.stopPropagation(); selectAllProjectKeys(); }}
                       style={{ color: currentTheme.colors.primary, borderRadius: '8px' }}
                     >
                       All
                     </button>
                     <button 
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                      className="text-xs px-2 py-1 rounded-lg transition-all duration-200 hover:bg-[var(--accent-primary)]/10"
                       onClick={(e) => { e.stopPropagation(); setTempSelectedProjectKeys([]); }}
                       style={{ color: currentTheme.colors.textSecondary, borderRadius: '8px' }}
                     >
@@ -3288,7 +3286,7 @@ export function DefectLeakageAnalyzer() {
               className="w-full rounded-xl px-3 py-2 text-sm border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between"
               style={{
                 borderColor: currentTheme.colors.border,
-                backgroundColor: isDarkMode ? currentTheme.colors.surface : '#FFFFFF',
+                backgroundColor: currentTheme.colors.surface,
                 color: headingColor,
                 borderRadius: '12px'
               }}
@@ -3339,14 +3337,14 @@ export function DefectLeakageAnalyzer() {
                   <span className="text-sm font-semibold" style={{ color: headingColor }}>Select Metrics</span>
                   <div className="flex gap-1">
                     <button 
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                      className="text-xs px-2 py-1 rounded-lg transition-all duration-200 hover:bg-[var(--accent-primary)]/10"
                       onClick={(e) => { e.stopPropagation(); selectAllMetrics(); }}
                       style={{ color: currentTheme.colors.primary, borderRadius: '8px' }}
                     >
                       All
                     </button>
                     <button 
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                      className="text-xs px-2 py-1 rounded-lg transition-all duration-200 hover:bg-[var(--accent-primary)]/10"
                       onClick={(e) => { e.stopPropagation(); clearMetricMultiSelect(); }}
                       style={{ color: currentTheme.colors.textSecondary, borderRadius: '8px' }}
                     >
@@ -3493,17 +3491,17 @@ export function DefectLeakageAnalyzer() {
                       className="px-3 py-1.5 text-sm rounded-xl border transition-all duration-200 font-medium"
                       style={{
                         background: dateFilterMode === mode.value 
-                          ? `linear-gradient(135deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary || currentTheme.colors.primary})`
+                          ? 'var(--accent-cool)'
                           : isDarkMode 
                             ? `linear-gradient(135deg, ${currentTheme.colors.surface}, ${currentTheme.colors.background})`
                             : `linear-gradient(135deg, ${cardBackground}, ${currentTheme.colors.background})`,
-                        borderColor: dateFilterMode === mode.value ? currentTheme.colors.primary : borderColor,
-                        color: dateFilterMode === mode.value ? '#FFFFFF' : headingColor,
+                        borderColor: dateFilterMode === mode.value ? 'var(--accent-cool)' : borderColor,
+                        color: dateFilterMode === mode.value ? '#000000' : headingColor,
                         borderRadius: '12px',
                         boxShadow: dateFilterMode === mode.value 
-                          ? `0 4px 12px ${currentTheme.colors.primary}40` 
+                          ? '0 4px 12px rgba(212,168,71,0.25)' 
                           : '0 1px 2px rgba(0, 0, 0, 0.05)',
-                        fontFamily: 'Inter, sans-serif'
+                        fontFamily: 'var(--font)'
                       }}
                     >
                       {mode.label}
@@ -3522,11 +3520,8 @@ export function DefectLeakageAnalyzer() {
                   role="switch"
                   aria-checked={enableComparison}
                   onClick={() => setEnableComparison(!enableComparison)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:ring-offset-2 ${
-                    enableComparison 
-                      ? 'bg-blue-600 dark:bg-blue-500' 
-                      : 'bg-slate-300 dark:bg-slate-600'
-                  }`}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{ backgroundColor: enableComparison ? currentTheme.colors.primary : currentTheme.colors.border }}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
@@ -3540,10 +3535,10 @@ export function DefectLeakageAnalyzer() {
             {/* Date Inputs based on mode */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Analysis Period */}
-              <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700" style={{ 
+              <div className="p-4 rounded-lg border" style={{ borderColor: currentTheme.colors.border, 
                 background: isDarkMode 
-                  ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.5), rgba(51, 65, 85, 0.5))'
-                  : 'linear-gradient(135deg, #F8FAFC, #FFFFFF)'
+                  ? `linear-gradient(135deg, ${currentTheme.colors.surface}80, ${currentTheme.colors.background}80)`
+                  : `linear-gradient(135deg, ${currentTheme.colors.background}, ${currentTheme.colors.surface})`
               }}>
                   <label className="text-sm font-medium mb-2 block" style={{ color: headingColor, fontFamily: 'Inter, sans-serif' }}>
                   {enableComparison ? 'Current Period' : 'Analysis Period'}
@@ -3712,10 +3707,10 @@ export function DefectLeakageAnalyzer() {
 
               {/* Comparison Period - only show when comparison enabled */}
               {enableComparison && (
-                <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700" style={{ 
+                <div className="p-4 rounded-lg border" style={{ borderColor: currentTheme.colors.border, 
                   background: isDarkMode 
-                    ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.5), rgba(51, 65, 85, 0.5))'
-                    : 'linear-gradient(135deg, #F8FAFC, #FFFFFF)'
+                    ? `linear-gradient(135deg, ${currentTheme.colors.surface}80, ${currentTheme.colors.background}80)`
+                    : `linear-gradient(135deg, ${currentTheme.colors.background}, ${currentTheme.colors.surface})`
                 }}>
                   <label className="text-sm font-medium mb-2 block" style={{ color: headingColor, fontFamily: 'Inter, sans-serif' }}>
                     Comparison Period
@@ -4255,11 +4250,11 @@ export function DefectLeakageAnalyzer() {
                     .sort((a, b) => b.current - a.current); // Sort by current value descending
 
                   const chartColors = {
-                    primary: isDarkMode ? '#60A5FA' : '#3B82F6',
+                    primary: isDarkMode ? '#D4A847' : '#3B82F6',
                     secondary: isDarkMode ? '#34D399' : '#10B981',
                     negative: isDarkMode ? '#F87171' : '#EF4444',
-                    text: isDarkMode ? '#E5E7EB' : '#1F2937',
-                    grid: isDarkMode ? '#374151' : '#E5E7EB'
+                    text: currentTheme.colors.text,
+                    grid: currentTheme.colors.border
                   };
 
                   return (
@@ -4291,7 +4286,7 @@ export function DefectLeakageAnalyzer() {
                               />
                               <Tooltip 
                                 contentStyle={{ 
-                                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                                  backgroundColor: currentTheme.colors.surface,
                                   border: `1px solid ${chartColors.grid}`,
                                   borderRadius: '8px'
                                 }}
@@ -4330,7 +4325,7 @@ export function DefectLeakageAnalyzer() {
                               />
                               <Tooltip 
                                 contentStyle={{ 
-                                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                                  backgroundColor: currentTheme.colors.surface,
                                   border: `1px solid ${chartColors.grid}`,
                                   borderRadius: '8px'
                                 }}
@@ -4373,7 +4368,7 @@ export function DefectLeakageAnalyzer() {
                                 <YAxis tick={{ fill: chartColors.text, fontSize: 12 }} />
                                 <Tooltip 
                                   contentStyle={{ 
-                                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                                    backgroundColor: currentTheme.colors.surface,
                                     border: `1px solid ${chartColors.grid}`,
                                     borderRadius: '8px'
                                   }}
@@ -4402,7 +4397,7 @@ export function DefectLeakageAnalyzer() {
                                 <YAxis tick={{ fill: chartColors.text, fontSize: 12 }} />
                                 <Tooltip 
                                   contentStyle={{ 
-                                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                                    backgroundColor: currentTheme.colors.surface,
                                     border: `1px solid ${chartColors.grid}`,
                                     borderRadius: '8px'
                                   }}
@@ -4563,7 +4558,7 @@ export function DefectLeakageAnalyzer() {
                   <tbody>
                   {(() => {
                     const grandTotal = metricRows.length > 1 ? calculateGrandTotal(metricRows) : null;
-                    const cellBorder = isDarkMode ? '#374151' : '#E5E7EB';
+                    const cellBorder = currentTheme.colors.border;
                     
                     // Professional color scheme
                     // Updated color functions using design palette
@@ -4913,7 +4908,7 @@ export function DefectLeakageAnalyzer() {
                                   <td className="py-3 px-4 text-center text-sm font-semibold" style={{ 
                                     borderBottom: `1px solid ${cellBorder}`, 
                                     borderRight: `1px solid ${cellBorder}`, 
-                                    color: isDarkMode ? '#60A5FA' : '#1D4ED8',
+                                    color: isDarkMode ? '#D4A847' : '#1D4ED8',
                                     fontFamily: 'Inter, sans-serif'
                                   }}>
                                         {row.total_regression_tests ?? row.total_test_cases ?? 0}
@@ -4927,7 +4922,7 @@ export function DefectLeakageAnalyzer() {
                                             fontFamily: 'Inter, sans-serif'
                                           }}>
                                             {period1.automated_count ?? 0}
-                                            <span className="block text-xs text-gray-500 mt-1">
+                                            <span className="block text-xs mt-1" style={{ color: currentTheme.colors.textSecondary }}>
                                               ({formatPercentage(period1.automation_percentage ?? 0)})
                                             </span>
                                           </td>
@@ -4948,7 +4943,7 @@ export function DefectLeakageAnalyzer() {
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                         {period?.automated_count ?? 0}
-                                        <span className="block text-xs text-gray-500 mt-1">
+                                        <span className="block text-xs mt-1" style={{ color: currentTheme.colors.textSecondary }}>
                                           ({formatPercentage(period?.automation_percentage ?? 0)})
                                         </span>
                                       </td>
@@ -4982,7 +4977,7 @@ export function DefectLeakageAnalyzer() {
                                       }}>
                                         <div 
                                           style={{ 
-                                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                                            color: currentTheme.colors.text,
                                           }}
                                           dangerouslySetInnerHTML={{
                                             __html: (row.ai_analysis || row.ai_insights || '')
@@ -4998,7 +4993,7 @@ export function DefectLeakageAnalyzer() {
                                       <td className="py-3 px-4 text-center text-sm font-semibold" style={{ 
                                         borderBottom: `1px solid ${cellBorder}`, 
                                         borderRight: `1px solid ${cellBorder}`, 
-                                        color: isDarkMode ? '#60A5FA' : '#1D4ED8',
+                                        color: isDarkMode ? '#D4A847' : '#1D4ED8',
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                         {row.total_stories ?? 0}
@@ -5012,7 +5007,7 @@ export function DefectLeakageAnalyzer() {
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                             {period1.stories_with_tests ?? 0}
-                                        <span className="block text-xs text-gray-500 mt-1">
+                                        <span className="block text-xs mt-1" style={{ color: currentTheme.colors.textSecondary }}>
                                               ({formatPercentage(period1.coverage_percentage ?? 0)})
                                         </span>
                                       </td>
@@ -5033,7 +5028,7 @@ export function DefectLeakageAnalyzer() {
                                     fontFamily: 'Inter, sans-serif'
                                   }}>
                                         {period?.stories_with_tests ?? 0}
-                                    <span className="block text-xs text-gray-500 mt-1">
+                                    <span className="block text-xs mt-1" style={{ color: currentTheme.colors.textSecondary }}>
                                           ({formatPercentage(period?.coverage_percentage ?? 0)})
                                     </span>
                                   </td>
@@ -5067,7 +5062,7 @@ export function DefectLeakageAnalyzer() {
                                   }}>
                                     <div 
                                       style={{ 
-                                        color: isDarkMode ? '#E5E7EB' : '#374151',
+                                        color: currentTheme.colors.text,
                                       }}
                                       dangerouslySetInnerHTML={{
                                             __html: (row.ai_analysis || row.ai_insights || '')
@@ -5083,7 +5078,7 @@ export function DefectLeakageAnalyzer() {
                                       <td className="py-3 px-4 text-center text-sm font-semibold" style={{ 
                                         borderBottom: `1px solid ${cellBorder}`, 
                                         borderRight: `1px solid ${cellBorder}`, 
-                                        color: isDarkMode ? '#60A5FA' : '#1D4ED8',
+                                        color: isDarkMode ? '#D4A847' : '#1D4ED8',
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                         {period?.total_test_cases ?? 0}
@@ -5146,7 +5141,7 @@ export function DefectLeakageAnalyzer() {
                                       }}>
                                         <div 
                                           style={{ 
-                                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                                            color: currentTheme.colors.text,
                                           }}
                                           dangerouslySetInnerHTML={{
                                             __html: (row.ai_analysis || row.ai_insights || '')
@@ -5162,7 +5157,7 @@ export function DefectLeakageAnalyzer() {
                                       <td className="py-3 px-4 text-center text-sm font-semibold" style={{ 
                                         borderBottom: `1px solid ${cellBorder}`, 
                                         borderRight: `1px solid ${cellBorder}`, 
-                                        color: isDarkMode ? '#60A5FA' : '#1D4ED8',
+                                        color: isDarkMode ? '#D4A847' : '#1D4ED8',
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                         {period?.bugs_found ?? 0}
@@ -5225,7 +5220,7 @@ export function DefectLeakageAnalyzer() {
                                       }}>
                                         <div 
                                           style={{ 
-                                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                                            color: currentTheme.colors.text,
                                           }}
                                           dangerouslySetInnerHTML={{
                                             __html: (row.ai_analysis || row.ai_insights || '')
@@ -5241,7 +5236,7 @@ export function DefectLeakageAnalyzer() {
                                       <td className="py-3 px-4 text-center text-sm font-semibold" style={{ 
                                         borderBottom: `1px solid ${cellBorder}`, 
                                         borderRight: `1px solid ${cellBorder}`, 
-                                        color: isDarkMode ? '#60A5FA' : '#1D4ED8',
+                                        color: isDarkMode ? '#D4A847' : '#1D4ED8',
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                         {row.total_stories ?? 0}
@@ -5255,7 +5250,7 @@ export function DefectLeakageAnalyzer() {
                                             fontFamily: 'Inter, sans-serif'
                                           }}>
                                             {period1.reviewed_yes ?? 0}
-                                            <span className="block text-xs text-gray-500 mt-1">
+                                            <span className="block text-xs mt-1" style={{ color: currentTheme.colors.textSecondary }}>
                                               ({formatPercentage(period1.review_percentage ?? 0)})
                                             </span>
                                           </td>
@@ -5276,7 +5271,7 @@ export function DefectLeakageAnalyzer() {
                                         fontFamily: 'Inter, sans-serif'
                                       }}>
                                         {period?.reviewed_yes ?? 0}
-                                        <span className="block text-xs text-gray-500 mt-1">
+                                        <span className="block text-xs mt-1" style={{ color: currentTheme.colors.textSecondary }}>
                                           ({formatPercentage(period?.review_percentage ?? 0)})
                                         </span>
                                       </td>
@@ -5310,7 +5305,7 @@ export function DefectLeakageAnalyzer() {
                                       }}>
                                         <div 
                                           style={{ 
-                                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                                            color: currentTheme.colors.text,
                                           }}
                                           dangerouslySetInnerHTML={{
                                             __html: (row.ai_analysis || row.ai_insights || '')
@@ -5327,7 +5322,7 @@ export function DefectLeakageAnalyzer() {
                                   <td className="py-3 px-4 text-center text-sm font-semibold" style={{ 
                                     borderBottom: `1px solid ${cellBorder}`, 
                                     borderRight: `1px solid ${cellBorder}`, 
-                                    color: isDarkMode ? '#60A5FA' : '#1D4ED8',
+                                    color: isDarkMode ? '#D4A847' : '#1D4ED8',
                                     fontFamily: 'Inter, sans-serif'
                                   }}>
                             {row.current_week.bugs_count ?? 0}
@@ -5977,7 +5972,7 @@ export function DefectLeakageAnalyzer() {
                 style={{
                   textAlign: 'right',
                   fontSize: '12px',
-                  color: isDarkMode ? '#94A3B8' : '#64748B',
+                  color: currentTheme.colors.textSecondary,
                   fontFamily: 'Inter, sans-serif',
                   marginBottom: '8px',
                   paddingRight: '4px'
@@ -5998,17 +5993,17 @@ export function DefectLeakageAnalyzer() {
           style={{
             backgroundColor: isDarkMode ? `${currentTheme.colors.info}15` : '#EFF6FF',
             borderColor: isDarkMode ? `${currentTheme.colors.info}40` : '#BFDBFE',
-            color: isDarkMode ? '#93C5FD' : '#1E3A8A'
+            color: currentTheme.colors.info
           }}
         >
-          <Info className="h-4 w-4" style={{ color: isDarkMode ? '#60A5FA' : currentTheme.colors.info }} />
-          <AlertDescription className="text-sm" style={{ color: isDarkMode ? '#E0F2FE' : '#1E3A8A' }}>
+          <Info className="h-4 w-4" style={{ color: isDarkMode ? '#D4A847' : currentTheme.colors.info }} />
+          <AlertDescription className="text-sm" style={{ color: currentTheme.colors.info }}>
               <strong>TCOE Report:</strong> Select filters above and click "Generate" to analyze defect leakage.
               Click on Portfolio or Project Key dropdown to select multiple items with checkboxes.
           </AlertDescription>
         </Alert>
       )}
     </div>
-    </div>
+    </DashboardLayout>
   );
 }

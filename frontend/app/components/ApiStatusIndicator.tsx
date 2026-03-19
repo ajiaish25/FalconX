@@ -34,11 +34,11 @@ export function ApiStatusIndicator({ className = '' }: ApiStatusIndicatorProps) 
   const getStatusIcon = () => {
     switch (status) {
       case 'online':
-        return <CheckCircle className="w-3 h-3 text-green-500" />
+        return <CheckCircle className="w-3 h-3 text-[var(--text-secondary)]" />
       case 'offline':
         return <XCircle className="w-3 h-3 text-red-500" />
       case 'error':
-        return <AlertCircle className="w-3 h-3 text-yellow-500" />
+        return <AlertCircle className="w-3 h-3 text-[var(--text-secondary)]" />
       default:
         return <XCircle className="w-3 h-3 text-gray-500" />
     }
@@ -65,9 +65,9 @@ export function ApiStatusIndicator({ className = '' }: ApiStatusIndicatorProps) 
         'bg-yellow-500'
       }`}></div>
       <span className={`${
-        status === 'online' ? 'text-green-700 dark:text-green-400' : 
+        status === 'online' ? 'text-[var(--text-secondary)]' : 
         status === 'offline' ? 'text-red-700 dark:text-red-400' : 
-        'text-yellow-700 dark:text-yellow-400'
+        'text-[var(--text-secondary)]'
       }`}>
         {getStatusText()}
       </span>

@@ -74,7 +74,7 @@ export function WelcomePopup({ onClose, userHasTyped = false }: WelcomePopupProp
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-6 right-6 z-[9999]"
+          className="fixed bottom-6 right-6 z-[9999]"
           style={{ pointerEvents: 'none' }}
         >
           <div className="relative flex items-start gap-4">

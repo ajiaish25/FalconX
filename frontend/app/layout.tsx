@@ -28,6 +28,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      {/*
+        Flash-of-wrong-theme prevention: runs synchronously before first paint.
+        Reads the persisted preference (default: dark) and applies .dark immediately,
+        so :root CSS vars resolve to the correct palette before React hydrates.
+      */}
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('falconx-theme');if(s==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} font-sans`}>
         <ErrorBoundary>
           <QueryProvider>
@@ -35,7 +47,7 @@ export default function RootLayout({
               <AuthProvider>
                 <UserProvider>
                   <ChatProvider>
-                    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: 'var(--color-background)' }}>
+                    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: 'var(--bg-page)' }}>
                       {/* Main Content Area */}
                       <main>
                         {children}

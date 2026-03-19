@@ -4,15 +4,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader } from '../../../ui/card';
 import { Skeleton } from '../../../ui/skeleton';
-import { useTheme } from '../../../../contexts/ThemeContext';
+import { DashboardLayout } from '../../../DashboardLayout';
 
 export function LoadingSkeleton() {
-  const { isDarkMode } = useTheme();
-
   return (
-    <div className={`h-full overflow-auto transition-all duration-300 ${
-      isDarkMode ? 'bg-gray-900' : 'bg-white'
-    }`}>
+    <DashboardLayout>
+    <div className="flex-1 min-h-0 overflow-auto">
       <div className="p-6 space-y-8">
         {/* Header Skeleton */}
         <motion.div
@@ -54,7 +51,7 @@ export function LoadingSkeleton() {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         >
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2">
+            <Card key={i} className="backdrop-blur-xl border-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border)' }}>
               <CardHeader className="pb-3">
                 <Skeleton className="h-4 w-24 mb-2" />
                 <Skeleton className="h-8 w-16" />
@@ -74,7 +71,7 @@ export function LoadingSkeleton() {
           className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         >
           {[1, 2].map((i) => (
-            <Card key={i} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2">
+            <Card key={i} className="backdrop-blur-xl border-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border)' }}>
               <CardHeader>
                 <Skeleton className="h-6 w-40" />
               </CardHeader>
@@ -94,7 +91,7 @@ export function LoadingSkeleton() {
           <Skeleton className="h-8 w-48 mb-6" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2">
+              <Card key={i} className="backdrop-blur-xl border-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border)' }}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <Skeleton className="h-12 w-12 rounded-2xl" />
@@ -122,6 +119,7 @@ export function LoadingSkeleton() {
         </motion.div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }
 

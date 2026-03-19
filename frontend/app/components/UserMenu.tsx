@@ -1,17 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { Badge } from './ui/badge'
-import { 
-  ChevronDown, 
-  User, 
-  Mail, 
-  Key, 
-  Save, 
+import {
+  ChevronDown,
+  User,
+  Mail,
+  Key,
+  Save,
   Edit3,
   Check,
   X
@@ -25,8 +20,33 @@ interface UserDetails {
   apiToken: string
 }
 
+const inputStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
+  color: 'var(--text-primary)',
+  borderRadius: 8,
+  padding: '7px 10px',
+  fontSize: 13,
+  width: '100%',
+  boxSizing: 'border-box',
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  outline: 'none',
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  color: 'var(--text-secondary)',
+  marginBottom: 6,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.05em',
+}
+
 export function UserMenu() {
-  const { userDetails, updateUserDetails, saveUserDetails } = useUser()
+  const { userDetails, updateUserDetails } = useUser()
   const [isOpen, setIsOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editDetails, setEditDetails] = useState<UserDetails>({ ...userDetails })
@@ -50,139 +70,219 @@ export function UserMenu() {
     setEditDetails(prev => ({ ...prev, [field]: value }))
   }
 
-  return (
-    <div className="relative">
-      <Button
-        variant="ghost"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-      >
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">{userDetails.name}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Principal QA Engineer</p>
-        </div>
-        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">AK</span>
-        </div>
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </Button>
+  const initials = userDetails.name
+    ? userDetails.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+    : 'AK'
 
+  return (
+    <div style={{ position: 'relative', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      {/* Trigger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0',
+        }}
+      >
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{userDetails.name}</p>
+          <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: 0 }}>Principal QA Engineer</p>
+        </div>
+        <div
+          style={{
+            width: 34, height: 34, borderRadius: '50%',
+            background: 'var(--bg-active)', border: '1px solid var(--border-strong)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{initials}</span>
+        </div>
+        <ChevronDown
+          style={{
+            width: 14, height: 14, color: 'var(--text-secondary)',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 200ms',
+          }}
+        />
+      </button>
+
+      {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 z-50">
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-                  User Profile
-                </CardTitle>
-                {!isEditing ? (
-                  <Button variant="ghost" size="sm" onClick={handleEdit}>
-                    <Edit3 className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <div className="flex space-x-1">
-                    <Button variant="ghost" size="sm" onClick={handleSave}>
-                      <Check className="w-4 h-4 text-green-600" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleCancel}>
-                      <X className="w-4 h-4 text-red-600" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* User Name */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                  <User className="w-4 h-4 mr-2" />
+        <>
+          {/* Backdrop to close on outside click */}
+          <div
+            onClick={() => setIsOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+          />
+          <div
+            style={{
+              position: 'absolute', right: 0, top: 'calc(100% + 8px)',
+              width: 320, zIndex: 50,
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              boxShadow: 'var(--shadow-medium)',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 18px 14px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>User Profile</span>
+              {!isEditing ? (
+                <button
+                  onClick={handleEdit}
+                  style={{
+                    background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '5px 8px',
+                    cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex',
+                  }}
+                >
+                  <Edit3 style={{ width: 14, height: 14 }} />
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={handleSave}
+                    style={{
+                      background: 'var(--accent-cool-bg)', border: '1px solid var(--accent-cool)',
+                      borderRadius: 8, padding: '5px 8px',
+                      cursor: 'pointer', color: 'var(--accent-cool)', display: 'flex',
+                    }}
+                  >
+                    <Check style={{ width: 14, height: 14 }} />
+                  </button>
+                  <button
+                    onClick={handleCancel}
+                    style={{
+                      background: 'var(--red-bg)', border: '1px solid var(--red)',
+                      borderRadius: 8, padding: '5px 8px',
+                      cursor: 'pointer', color: 'var(--red)', display: 'flex',
+                    }}
+                  >
+                    <X style={{ width: 14, height: 14 }} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Fields */}
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Full Name */}
+              <div>
+                <label style={labelStyle}>
+                  <User style={{ width: 12, height: 12 }} />
                   Full Name
-                </Label>
+                </label>
                 {isEditing ? (
-                  <Input
+                  <input
                     value={editDetails.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onChange={e => handleInputChange('name', e.target.value)}
+                    style={inputStyle}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 dark:text-white">{userDetails.name}</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>{userDetails.name}</p>
                 )}
               </div>
+
+              {/* Section separator */}
+              <div style={{ background: 'var(--border)', height: 1 }} />
 
               {/* Email */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                  <Mail className="w-4 h-4 mr-2" />
+              <div>
+                <label style={labelStyle}>
+                  <Mail style={{ width: 12, height: 12 }} />
                   Email Address
-                </Label>
+                </label>
                 {isEditing ? (
-                  <Input
+                  <input
                     value={editDetails.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onChange={e => handleInputChange('email', e.target.value)}
+                    style={inputStyle}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 dark:text-white">{userDetails.email}</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>{userDetails.email}</p>
                 )}
               </div>
 
               {/* Atlassian Account */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                  <Key className="w-4 h-4 mr-2" />
+              <div>
+                <label style={labelStyle}>
+                  <Key style={{ width: 12, height: 12 }} />
                   Atlassian Account
-                </Label>
+                </label>
                 {isEditing ? (
-                  <Input
+                  <input
                     value={editDetails.atlassianAccount}
-                    onChange={(e) => handleInputChange('atlassianAccount', e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onChange={e => handleInputChange('atlassianAccount', e.target.value)}
+                    style={inputStyle}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 dark:text-white">{userDetails.atlassianAccount}</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>{userDetails.atlassianAccount}</p>
                 )}
               </div>
 
               {/* API Token */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                  <Key className="w-4 h-4 mr-2" />
+              <div>
+                <label style={labelStyle}>
+                  <Key style={{ width: 12, height: 12 }} />
                   API Token
-                </Label>
+                </label>
                 {isEditing ? (
-                  <Input
+                  <input
                     type="password"
                     value={editDetails.apiToken}
-                    onChange={(e) => handleInputChange('apiToken', e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onChange={e => handleInputChange('apiToken', e.target.value)}
+                    style={inputStyle}
                     placeholder="Enter your API token"
                   />
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-900 dark:text-white">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>
                       {userDetails.apiToken ? '••••••••••••••••' : 'Not set'}
                     </p>
-                    <Badge variant="secondary" className="text-xs">
+                    <span
+                      style={{
+                        fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        background: 'var(--bg-active)', color: 'var(--text-secondary)',
+                        border: '1px solid var(--border)', borderRadius: 6,
+                        padding: '2px 7px',
+                      }}
+                    >
                       Protected
-                    </Badge>
+                    </span>
                   </div>
                 )}
               </div>
 
+              {/* Save button when editing */}
               {isEditing && (
-                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <Button 
-                    onClick={handleSave} 
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                <>
+                  <div style={{ background: 'var(--border)', height: 1 }} />
+                  <button
+                    onClick={handleSave}
+                    style={{
+                      width: '100%', padding: '9px 0', borderRadius: 8, fontSize: 13,
+                      fontWeight: 600, cursor: 'pointer',
+                      background: 'var(--text-primary)', color: 'var(--bg-page)', border: 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
                   >
-                    <Save className="w-4 h-4 mr-2" />
+                    <Save style={{ width: 14, height: 14 }} />
                     Save Changes
-                  </Button>
-                </div>
+                  </button>
+                </>
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

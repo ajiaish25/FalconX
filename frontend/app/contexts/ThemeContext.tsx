@@ -1,91 +1,65 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Theme, getTheme, getAllThemes, generateThemeCSS } from '../utils/themes';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Theme, getTheme } from '../utils/themes';
 
 interface ThemeContextType {
   currentTheme: Theme;
   isDarkMode: boolean;
-  themeName: string;
-  setTheme: (themeName: string) => void;
   toggleDarkMode: () => void;
-  availableThemes: Theme[];
   isThemeLoaded: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+const STORAGE_KEY = 'falconx-theme';
+const TRANSITION_CLASS = 'theme-transitioning';
+const TRANSITION_DURATION = 300; // ms — matches CSS transition durations
 
 interface ThemeProviderProps {
   children: ReactNode;
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const [themeName, setThemeName] = useState<string>('modernCorporate');
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [isThemeLoaded, setIsThemeLoaded] = useState<boolean>(false);
 
-  // Load theme preferences from localStorage
+  // On mount: read persisted preference (default: dark)
   useEffect(() => {
-    const savedTheme = localStorage.getItem('selectedTheme');
-    const savedDarkMode = localStorage.getItem('isDarkMode');
-    
-    if (savedTheme) {
-      setThemeName(savedTheme);
-    }
-    if (savedDarkMode !== null) {
-      setIsDarkMode(JSON.parse(savedDarkMode));
-    }
-    
-    // Mark theme as loaded
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const prefersDark = stored !== null
+      ? stored === 'dark'
+      : true; // FalconX default is dark
+
+    applyTheme(prefersDark);
+    setIsDarkMode(prefersDark);
     setIsThemeLoaded(true);
   }, []);
 
-  // Get current theme - ensure new object reference for React re-renders
-  const currentTheme = React.useMemo(() => getTheme(themeName, isDarkMode), [themeName, isDarkMode]);
-  const availableThemes = getAllThemes(isDarkMode);
+  const currentTheme = React.useMemo(() => getTheme('cdk', isDarkMode), [isDarkMode]);
 
-  // Apply theme CSS to document
-  useEffect(() => {
-    const themeCSS = generateThemeCSS(currentTheme);
-    
-    // Remove existing theme style
-    const existingStyle = document.getElementById('theme-styles');
-    if (existingStyle) {
-      existingStyle.remove();
-    }
-    
-    // Add new theme style
-    const style = document.createElement('style');
-    style.id = 'theme-styles';
-    style.textContent = themeCSS;
-    document.head.appendChild(style);
-    
-    // Update document class for dark mode
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [currentTheme, isDarkMode]);
+  /** Toggle between dark and light with a smooth CSS transition burst */
+  const toggleDarkMode = useCallback(() => {
+    setIsDarkMode(prev => {
+      const next = !prev;
 
-  const setTheme = (newThemeName: string) => {
-    setThemeName(newThemeName);
-    localStorage.setItem('selectedTheme', newThemeName);
-  };
+      // Briefly add transition class so CSS picks up all color changes smoothly
+      document.documentElement.classList.add(TRANSITION_CLASS);
+      applyTheme(next);
+      localStorage.setItem(STORAGE_KEY, next ? 'dark' : 'light');
 
-  const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode;
-    setIsDarkMode(newDarkMode);
-    localStorage.setItem('isDarkMode', JSON.stringify(newDarkMode));
-  };
+      setTimeout(() => {
+        document.documentElement.classList.remove(TRANSITION_CLASS);
+      }, TRANSITION_DURATION);
+
+      return next;
+    });
+  }, []);
 
   const value: ThemeContextType = {
     currentTheme,
     isDarkMode,
-    themeName,
-    setTheme,
     toggleDarkMode,
-    availableThemes,
     isThemeLoaded,
   };
 
@@ -103,3 +77,14 @@ export const useTheme = (): ThemeContextType => {
   }
   return context;
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Apply (or remove) the .dark class on <html> — all CSS vars follow automatically. */
+function applyTheme(dark: boolean) {
+  if (dark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}

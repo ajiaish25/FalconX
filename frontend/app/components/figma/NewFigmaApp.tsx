@@ -12,10 +12,11 @@ import { DefectLeakageAnalyzer } from '../DefectLeakageAnalyzer'
 import { QAMetricsDashboard } from '../QAMetricsDashboard'
 import { KPIMetricsDashboard } from '../KPIMetricsDashboard'
 import { GitHubInsightsDashboard } from '../GitHubInsightsDashboard'
+import { SalesforceInsightsDashboard } from '../SalesforceInsightsDashboard'
 import { useTheme } from '../../contexts/ThemeContext'
 import { SettingsProvider } from '../../contexts/SettingsContext'
 
-export type ActiveView = 'copilot' | 'insights' | 'github-insights' | 'leadership' | 'tcoe-report' | 'qa-metrics' | 'kpi-metrics'
+export type ActiveView = 'copilot' | 'insights' | 'github-insights' | 'leadership' | 'tcoe-report' | 'qa-metrics' | 'kpi-metrics' | 'salesforce-insights'
 export type Theme = 'light' | 'dark'
 
 export interface Connection {
@@ -35,9 +36,11 @@ export default function NewFigmaApp() {
 function NewFigmaAppContent() {
   const { currentTheme, isDarkMode } = useTheme();
   const [activeView, setActiveView] = useState<ActiveView>('copilot')
+  const [integrations, setIntegrations] = useState<string[]>([])
+  const [uploadedDocReady, setUploadedDocReady] = useState(false)
   
   // Handler for view change
-  const handleViewChange = (view: 'copilot' | 'insights' | 'github-insights' | 'leadership' | 'tcoe-report' | 'qa-metrics' | 'kpi-metrics') => {
+  const handleViewChange = (view: 'copilot' | 'insights' | 'github-insights' | 'leadership' | 'tcoe-report' | 'qa-metrics' | 'kpi-metrics' | 'salesforce-insights') => {
     setActiveView(view as ActiveView);
   };
   const [showSettings, setShowSettings] = useState(false)
@@ -178,6 +181,10 @@ function NewFigmaAppContent() {
           theme={isDarkMode ? 'dark' : 'light'}
           quickActionPrompt={quickActionPrompt}
           onPromptSent={clearQuickActionPrompt}
+          integrations={integrations}
+          setIntegrations={setIntegrations}
+          uploadedDocReady={uploadedDocReady}
+          setUploadedDocReady={setUploadedDocReady}
         />
       case 'tcoe-report':
         return <DefectLeakageAnalyzer />
@@ -189,6 +196,8 @@ function NewFigmaAppContent() {
         return <InsightsDashboard />
       case 'github-insights':
         return <GitHubInsightsDashboard />
+      case 'salesforce-insights':
+        return <SalesforceInsightsDashboard />
       case 'leadership':
         return <FigmaDashboard hasActiveConnections={hasActiveConnections} theme={isDarkMode ? 'dark' : 'light'} />
       default:
@@ -197,12 +206,16 @@ function NewFigmaAppContent() {
           theme={isDarkMode ? 'dark' : 'light'}
           quickActionPrompt={quickActionPrompt}
           onPromptSent={clearQuickActionPrompt}
+          integrations={integrations}
+          setIntegrations={setIntegrations}
+          uploadedDocReady={uploadedDocReady}
+          setUploadedDocReady={setUploadedDocReady}
         />
     }
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50">
+    <div className="h-screen overflow-hidden" style={{ backgroundColor: currentTheme.colors.background }}>
       <div className="h-full flex">
         {/* Left Pane - Sidebar */}
         <div className="w-64 flex-shrink-0">
@@ -223,11 +236,18 @@ function NewFigmaAppContent() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header Pane */}
           <div className="flex-shrink-0">
-            <NewHeader theme={isDarkMode ? 'dark' : 'light'} setTheme={() => {}} />
+            <NewHeader
+            theme={isDarkMode ? 'dark' : 'light'}
+            setTheme={() => {}}
+            integrations={integrations}
+            setIntegrations={setIntegrations}
+            uploadedDocReady={uploadedDocReady}
+            setUploadedDocReady={setUploadedDocReady}
+          />
           </div>
           
           {/* Center Pane - Main Content */}
-          <main className="flex-1 min-h-0 pt-16 overflow-hidden">
+          <main className="flex-1 min-h-0 pt-[7.5rem] overflow-hidden">
             <motion.div
               key={activeView}
               initial={{ opacity: 0, x: 30, scale: 0.98 }}

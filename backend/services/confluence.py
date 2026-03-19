@@ -371,19 +371,29 @@ class ConfluenceClient:
         return all_pages
     
     @staticmethod
-    def extract_relevant_content(page_text: str, query: str, max_chars: int = 2500) -> str:
+    def extract_relevant_content(
+        page_text: str,
+        query: str,
+        max_chars: int = 2500,
+        date_filter: str = "",
+        column_filter: str = "",
+    ) -> str:
         """
         Extract the most query-relevant sections from a long Confluence page.
 
         Strategy:
-        1. Split page into paragraphs/sections
-        2. Score each section by query keyword overlap
-        3. Return top-scoring sections up to max_chars
+        1. If date_filter is set, surface rows/lines containing that date first
+           (critical for table_lookup queries like "which Jira ID Fixed on 03-19-2026")
+        2. Split page into paragraphs/sections
+        3. Score each section by query keyword overlap
+        4. Return top-scoring sections up to max_chars
 
         Args:
-            page_text: Full plain-text content of the page
-            query: The user's search query
-            max_chars: Maximum characters to return
+            page_text:     Full plain-text content of the page
+            query:         The user's search query
+            max_chars:     Maximum characters to return
+            date_filter:   Date string to prioritize (e.g. "03-19-2026")
+            column_filter: Column name to boost (e.g. "Jira ID Fixed")
 
         Returns:
             Concatenated relevant sections, trimmed to max_chars
@@ -392,6 +402,39 @@ class ConfluenceClient:
 
         if not page_text or len(page_text) <= max_chars:
             return page_text
+
+        # --- Priority: date-specific line extraction ---
+        # For table-lookup queries the answer is usually on a single line/row.
+        # Surfacing that line first ensures the LLM sees the relevant data even
+        # when the page is truncated.
+        if date_filter:
+            date_lines = [
+                ln.strip() for ln in page_text.splitlines()
+                if date_filter in ln and ln.strip()
+            ]
+            if date_lines:
+                # Include surrounding context: grab header row (first non-empty line)
+                # and the matching row(s).
+                first_line = ""
+                for ln in page_text.splitlines():
+                    if ln.strip():
+                        first_line = ln.strip()
+                        break
+                date_section = "\n".join(
+                    ([first_line] if first_line and first_line not in date_lines else [])
+                    + date_lines
+                )
+                # If the date section is small, append more context from the rest of the page
+                remaining = max_chars - len(date_section) - 10
+                if remaining > 200:
+                    other_content = ConfluenceClient.extract_relevant_content(
+                        page_text, query, max_chars=remaining
+                    )
+                    # Avoid duplicating the date lines
+                    for dl in date_lines:
+                        other_content = other_content.replace(dl, "")
+                    return date_section + "\n\n" + other_content.strip()
+                return date_section
 
         # Normalize query into keywords (ignore stop words)
         stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
@@ -404,6 +447,12 @@ class ConfluenceClient:
             w.lower() for w in re.findall(r'\w+', query)
             if w.lower() not in stop_words and len(w) > 2
         )
+        # Also add column filter words if provided
+        if column_filter:
+            query_words.update(
+                w.lower() for w in re.findall(r'\w+', column_filter)
+                if len(w) > 2
+            )
 
         # Split into chunks (paragraphs and sections)
         chunks = re.split(r'\n{2,}', page_text)

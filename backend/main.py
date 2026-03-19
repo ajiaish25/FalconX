@@ -48,6 +48,8 @@ from services.jira_rag_handler import get_jira_rag_handler
 from services.chatbot_engine import AdvancedChatbotEngine, QueryIntent
 from services.rag_handler import get_handler, LeadershipRAGHandler
 from services.github import GitHubClient, GitHubConfig
+from services.salesforce import SalesforceClient, SalesforceConfig
+from services.salesforce_classifier import batch_classify, classify_and_solve, get_categories, get_category_colors
 import re
 
 # Configure logging
@@ -65,6 +67,8 @@ class AppState:
         self.confluence_client = None
         self.confluence_config = None
         self.github_client = GitHubClient() # Initialize GitHub client
+        self.salesforce_client = SalesforceClient()  # Initialize Salesforce client
+        self._salesforce_classified_cache: list = []  # In-memory cache of classified cases
         self.messages = []
         self.export_files = {}
         self.ai_engine = None
@@ -5766,8 +5770,12 @@ async def get_enhanced_metrics(request: Dict[str, Any]):
         issues_data = await app_state.jira_client.search(jql, max_results=1000)
         issues = issues_data.get('issues', [])
 
-        # Generate enhanced metrics
-        enhanced_metrics = await generate_enhanced_metrics(issues, project_key, date_from, date_to)
+        # Generate enhanced metrics (pass client + board_id for real sprint data)
+        enhanced_metrics = await generate_enhanced_metrics(
+            issues, project_key, date_from, date_to,
+            jira_client=app_state.jira_client,
+            board_id=app_state.jira_board_id,
+        )
 
         return {
             "success": True,
@@ -5783,75 +5791,101 @@ async def get_enhanced_metrics(request: Dict[str, Any]):
             "error": str(e)
         }
 
-async def generate_enhanced_metrics(issues: list, project_key: str = None, date_from: str = '', date_to: str = ''):
+async def generate_enhanced_metrics(
+    issues: list,
+    project_key: str = None,
+    date_from: str = '',
+    date_to: str = '',
+    jira_client=None,
+    board_id: str = None,
+):
     """Generate comprehensive enhanced analytics metrics"""
+    from services.jira import JiraClient
 
-    # Sprint Velocity Trends (Mock data for now - would need sprint data from Jira)
-    sprint_velocity_trends = [
-        {
-            "sprintName": "Sprint 1",
-            "startDate": "2024-01-01",
-            "endDate": "2024-01-14",
-            "committedPoints": 45,
-            "completedPoints": 42,
-            "velocity": 42
-        },
-        {
-            "sprintName": "Sprint 2",
-            "startDate": "2024-01-15",
-            "endDate": "2024-01-28",
-            "committedPoints": 48,
-            "completedPoints": 45,
-            "velocity": 45
-        },
-        {
-            "sprintName": "Sprint 3",
-            "startDate": "2024-01-29",
-            "endDate": "2024-02-11",
-            "committedPoints": 50,
-            "completedPoints": 47,
-            "velocity": 47
-        },
-        {
-            "sprintName": "Sprint 4",
-            "startDate": "2024-02-12",
-            "endDate": "2024-02-25",
-            "committedPoints": 52,
-            "completedPoints": 49,
-            "velocity": 49
-        },
-        {
-            "sprintName": "Sprint 5",
-            "startDate": "2024-02-26",
-            "endDate": "2024-03-10",
-            "committedPoints": 55,
-            "completedPoints": 52,
-            "velocity": 52
-        }
-    ]
+    # ── Sprint Velocity Trends (real via Agile API, mock fallback) ────────────
+    sprint_velocity_trends = []
+    if jira_client and board_id:
+        try:
+            sprint_velocity_trends = await jira_client.get_sprint_history(int(board_id), limit=6)
+            logger.info(f"✅ Fetched {len(sprint_velocity_trends)} real sprints from board {board_id}")
+        except Exception as _e:
+            logger.warning(f"Sprint history fetch failed, using mock: {_e}")
 
-    # Burndown Data (Mock data)
-    burndown_data = [{
-        "sprintName": "Current Sprint",
-        "dates": ["2024-03-01", "2024-03-02", "2024-03-03", "2024-03-04", "2024-03-05", "2024-03-06", "2024-03-07"],
-        "idealBurndown": [50, 42.5, 35, 27.5, 20, 12.5, 5],
-        "actualBurndown": [50, 48, 42, 35, 28, 18, 8],
-        "remainingWork": [50, 48, 42, 35, 28, 18, 8]
-    }]
+    if not sprint_velocity_trends:
+        # Fallback: derive velocity-style data from real issues grouped by 2-week periods
+        from collections import defaultdict
+        period_buckets: dict = defaultdict(lambda: {"committed": 0, "completed": 0})
+        done_statuses_set = {"done", "resolved", "closed", "complete", "completed"}
+        for issue in issues:
+            fields = issue.get("fields", {})
+            points = fields.get("customfield_10016") or 0
+            updated = (fields.get("updated") or "")[:10]
+            status_name = (fields.get("status", {}).get("name") or "").lower()
+            if updated:
+                try:
+                    d = datetime.fromisoformat(updated)
+                    # Bucket by ISO week
+                    week_key = d.strftime("W%W %Y")
+                    period_buckets[week_key]["committed"] += points
+                    if status_name in done_statuses_set:
+                        period_buckets[week_key]["completed"] += points
+                except Exception:
+                    pass
+        for i, (period, vals) in enumerate(sorted(period_buckets.items())[-6:], 1):
+            sprint_velocity_trends.append({
+                "sprintName": f"Sprint {i} ({period})",
+                "startDate": "", "endDate": "",
+                "committedPoints": round(vals["committed"]),
+                "completedPoints": round(vals["completed"]),
+                "velocity": round(vals["completed"]),
+            })
 
-    # Predictive Analytics (AI-powered)
+    # ── Burndown Data — derived from latest sprint if available ───────────────
+    burndown_data = []
+    if sprint_velocity_trends:
+        latest = sprint_velocity_trends[-1]
+        committed_pts = latest.get("committedPoints", 50) or 50
+        completed_pts = latest.get("completedPoints", 0)
+        remaining = committed_pts - completed_pts
+        today = datetime.now()
+        dates = [(today - timedelta(days=6 - i)).strftime("%Y-%m-%d") for i in range(7)]
+        ideal = [round(committed_pts - (committed_pts / 6) * i, 1) for i in range(7)]
+        # Simple actual: linear decay down to `remaining` over 7 days
+        actual = [round(committed_pts - ((committed_pts - remaining) / 6) * i, 1) for i in range(7)]
+        burndown_data = [{
+            "sprintName": latest.get("sprintName", "Current Sprint"),
+            "dates": dates,
+            "idealBurndown": ideal,
+            "actualBurndown": actual,
+            "remainingWork": actual,
+        }]
+    else:
+        burndown_data = [{"sprintName": "No Sprint Data", "dates": [], "idealBurndown": [], "actualBurndown": [], "remainingWork": []}]
+
+    # ── Predictive Analytics — derived from real velocity trend ───────────────
+    velocities = [s.get("velocity", 0) for s in sprint_velocity_trends if s.get("velocity")]
+    if len(velocities) >= 2:
+        trend_val = velocities[-1] - velocities[0]
+        velocity_trend = "increasing" if trend_val > 0 else "decreasing" if trend_val < 0 else "stable"
+        forecasted = round(velocities[-1] * 1.05) if trend_val >= 0 else round(velocities[-1] * 0.95)
+        confidence = min(95, 65 + len(velocities) * 5)
+        risk = "low" if velocity_trend == "increasing" else "high" if velocity_trend == "decreasing" else "medium"
+    else:
+        velocity_trend = "stable"
+        forecasted = velocities[0] if velocities else 0
+        confidence = 60
+        risk = "medium"
     predictive_analytics = {
-        "sprintCompletionDate": "2024-03-12",
-        "completionConfidence": 85,
-        "velocityTrend": "increasing",
-        "forecastedVelocity": 54,
-        "riskLevel": "low",
+        "sprintCompletionDate": (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d"),
+        "completionConfidence": confidence,
+        "velocityTrend": velocity_trend,
+        "forecastedVelocity": forecasted,
+        "riskLevel": risk,
         "recommendations": [
-            "Current velocity trend is positive with 12% improvement over last 3 sprints",
-            "Consider increasing sprint commitment by 2-3 points based on trend analysis",
-            "Team capacity utilization is optimal at 87%",
-            "Bottleneck risk in 'In Review' status - monitor closely"
-        ]
+            f"Velocity trend is {velocity_trend} based on last {len(velocities)} sprint(s)",
+            "Monitor 'In Review' status for bottlenecks",
+            "Team capacity looks optimal" if risk == "low" else "Review workload distribution",
+        ],
     }
 
     # Bottleneck Analysis
@@ -5921,33 +5955,157 @@ async def generate_enhanced_metrics(issues: list, project_key: str = None, date_
             "status": status
         })
 
-    # Historical Comparison (Mock data for demo)
-    historical_comparison = [
-        {
-            "period": "Last Month",
-            "totalIssues": 45,
-            "completedIssues": 42,
-            "completionRate": 93,
-            "avgResolutionTime": 3.2,
-            "velocity": 42
-        },
-        {
-            "period": "This Month",
-            "totalIssues": 52,
-            "completedIssues": 47,
-            "completionRate": 90,
-            "avgResolutionTime": 2.8,
-            "velocity": 47
-        }
+    # ── Historical Comparison — derived from real issues ──────────────────────
+    now = datetime.now()
+    this_month_start = now.replace(day=1)
+    last_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+    done_statuses_h = {"done", "resolved", "closed", "complete", "completed"}
+
+    buckets_h = {
+        "Last Month": {"total": 0, "completed": 0, "resolution_days": [], "velocity": 0},
+        "This Month": {"total": 0, "completed": 0, "resolution_days": [], "velocity": 0},
+    }
+    for issue in issues:
+        fields = issue.get("fields", {})
+        updated_str = (fields.get("updated") or "")[:10]
+        created_str = (fields.get("created") or "")[:10]
+        status_name = (fields.get("status", {}).get("name") or "").lower()
+        points = fields.get("customfield_10016") or 0
+        try:
+            updated_d = datetime.fromisoformat(updated_str) if updated_str else None
+        except Exception:
+            updated_d = None
+        if not updated_d:
+            continue
+        bucket_key = None
+        if updated_d >= this_month_start:
+            bucket_key = "This Month"
+        elif updated_d >= last_month_start:
+            bucket_key = "Last Month"
+        if not bucket_key:
+            continue
+        b = buckets_h[bucket_key]
+        b["total"] += 1
+        if status_name in done_statuses_h:
+            b["completed"] += 1
+            b["velocity"] += points
+            try:
+                if created_str:
+                    created_d = datetime.fromisoformat(created_str)
+                    b["resolution_days"].append((updated_d - created_d).days)
+            except Exception:
+                pass
+
+    historical_comparison = []
+    for period in ["Last Month", "This Month"]:
+        b = buckets_h[period]
+        total = b["total"] or 1
+        completed = b["completed"]
+        avg_res = round(sum(b["resolution_days"]) / len(b["resolution_days"]), 1) if b["resolution_days"] else 0
+        historical_comparison.append({
+            "period": period,
+            "totalIssues": b["total"],
+            "completedIssues": completed,
+            "completionRate": round((completed / total) * 100),
+            "avgResolutionTime": avg_res,
+            "velocity": b["velocity"],
+        })
+
+    # ── Monthly Trends — last 6 months from real issues ───────────────────────
+    month_data: dict = {}
+    for i in range(5, -1, -1):
+        ref = now - timedelta(days=30 * i)
+        key = ref.strftime("%b")
+        month_data[key] = {"issues": 0, "completed": 0, "velocity": 0, "month_dt": ref.replace(day=1)}
+
+    for issue in issues:
+        fields = issue.get("fields", {})
+        updated_str = (fields.get("updated") or "")[:10]
+        status_name = (fields.get("status", {}).get("name") or "").lower()
+        points = fields.get("customfield_10016") or 0
+        try:
+            updated_d = datetime.fromisoformat(updated_str) if updated_str else None
+        except Exception:
+            updated_d = None
+        if not updated_d:
+            continue
+        label = updated_d.strftime("%b")
+        if label in month_data:
+            month_data[label]["issues"] += 1
+            if status_name in done_statuses_h:
+                month_data[label]["completed"] += 1
+                month_data[label]["velocity"] += points
+
+    months_list = list(month_data.keys())
+    monthly_trends = {
+        "months": months_list,
+        "issues": [month_data[m]["issues"] for m in months_list],
+        "velocity": [month_data[m]["velocity"] for m in months_list],
+        "completionRate": [
+            round((month_data[m]["completed"] / month_data[m]["issues"]) * 100) if month_data[m]["issues"] else 0
+            for m in months_list
+        ],
+    }
+
+    # ── Sprint Goal — latest sprint's goal text ───────────────────────────────
+    latest_sprint_goal = ""
+    if sprint_velocity_trends:
+        latest_sprint_goal = sprint_velocity_trends[-1].get("sprintGoal", "") or ""
+
+    # ── Issue Age Distribution — group open issues by age ─────────────────────
+    done_statuses_age = {"done", "resolved", "closed", "complete", "completed"}
+    age_buckets = {"0-7d": 0, "8-30d": 0, "31-90d": 0, "90d+": 0}
+    today = datetime.now()
+    for issue in issues:
+        fields = issue.get("fields", {})
+        status_name = (fields.get("status", {}).get("name") or "").lower()
+        if status_name in done_statuses_age:
+            continue  # Only count open issues
+        created_str = (fields.get("created") or "")[:10]
+        if not created_str:
+            continue
+        try:
+            age_days = (today - datetime.fromisoformat(created_str)).days
+            if age_days <= 7:
+                age_buckets["0-7d"] += 1
+            elif age_days <= 30:
+                age_buckets["8-30d"] += 1
+            elif age_days <= 90:
+                age_buckets["31-90d"] += 1
+            else:
+                age_buckets["90d+"] += 1
+        except Exception:
+            pass
+    issue_age_distribution = [
+        {"range": k, "count": v} for k, v in age_buckets.items()
     ]
 
-    # Monthly Trends
-    monthly_trends = {
-        "months": ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        "issues": [40, 45, 52, 48, 55, 50],
-        "velocity": [38, 42, 47, 45, 52, 49],
-        "completionRate": [95, 93, 90, 94, 92, 91]
-    }
+    # ── Due Date Risk — open issues overdue or due within 3 days ─────────────
+    due_date_risk = []
+    warning_cutoff = (today + timedelta(days=3)).strftime("%Y-%m-%d")
+    today_str = today.strftime("%Y-%m-%d")
+    for issue in issues:
+        fields = issue.get("fields", {})
+        status_name = (fields.get("status", {}).get("name") or "").lower()
+        if status_name in done_statuses_age:
+            continue
+        due_date = (fields.get("duedate") or "")[:10]
+        if not due_date:
+            continue
+        if due_date <= warning_cutoff:
+            is_overdue = due_date < today_str
+            due_date_risk.append({
+                "key": issue.get("key", ""),
+                "summary": fields.get("summary", "")[:80],
+                "dueDate": due_date,
+                "assignee": (fields.get("assignee") or {}).get("displayName", "Unassigned"),
+                "status": fields.get("status", {}).get("name", "Unknown"),
+                "priority": (fields.get("priority") or {}).get("name", "Medium"),
+                "isOverdue": is_overdue,
+            })
+    # Sort: overdue first, then by due date
+    due_date_risk.sort(key=lambda x: (not x["isOverdue"], x["dueDate"]))
+    due_date_risk = due_date_risk[:15]  # Cap at 15
 
     return {
         "sprintVelocityTrends": sprint_velocity_trends,
@@ -5956,7 +6114,10 @@ async def generate_enhanced_metrics(issues: list, project_key: str = None, date_
         "bottleneckAnalysis": bottleneck_analysis,
         "teamCapacity": team_capacity,
         "historicalComparison": historical_comparison,
-        "monthlyTrends": monthly_trends
+        "monthlyTrends": monthly_trends,
+        "issueAgeDistribution": issue_age_distribution,
+        "dueDateRisk": due_date_risk,
+        "latestSprintGoal": latest_sprint_goal,
     }
 
 # ==========================================
@@ -6040,6 +6201,221 @@ async def github_actions_runs(repo: str, days: int = 30, workflow: str = None):
     except Exception as e:
         logger.error(f"GitHub actions error: {e}")
         return create_error_response("Failed to fetch actions", str(e))
+
+@app.get("/api/github/prs", tags=["GitHub"], summary="Get Recent Pull Requests")
+async def get_github_prs(
+    repo: str = Query(..., description="Full repo name e.g. org/repo"),
+    state: str = Query("all", description="PR state: open, closed, all"),
+    per_page: int = Query(20, le=50)
+):
+    result = await app_state.github_client.get_recent_prs(repo=repo, state=state, per_page=per_page)
+    return result
+
+@app.get("/api/github/repo-detail", tags=["GitHub"], summary="Get enriched repo detail: last merged PR, active branches, open PRs")
+async def get_github_repo_detail(repo: str = Query(..., description="Full repo name e.g. org/repo")):
+    try:
+        return await app_state.github_client.get_repo_detail(repo=repo)
+    except Exception as e:
+        logger.error(f"GitHub repo-detail error: {e}")
+        return {"repo": repo, "default_branch": "main", "last_merged_pr": None, "active_branches": [], "open_prs": []}
+
+# ==========================================
+# Salesforce Integration Endpoints
+# ==========================================
+
+@app.post("/api/salesforce/configure", tags=["Salesforce"], summary="Configure Salesforce Connection")
+async def salesforce_configure(config: Dict[str, str]):
+    """
+    Save Salesforce credentials and verify connection.
+    Requires: instance_url, client_id, client_secret, username, password
+    """
+    try:
+        instance_url = config.get("instance_url", "").rstrip("/")
+        client_id = config.get("client_id", "")
+        client_secret = config.get("client_secret", "")
+        username = config.get("username", "")
+        password = config.get("password", "")
+
+        if not all([instance_url, client_id, client_secret, username, password]):
+            return create_error_response("All Salesforce credentials are required", status_code=400)
+
+        # Update app state client config
+        sf_config = SalesforceConfig()
+        sf_config.instance_url = instance_url
+        sf_config.client_id = client_id
+        sf_config.client_secret = client_secret
+        sf_config.username = username
+        sf_config.password = password
+
+        app_state.salesforce_client = SalesforceClient(sf_config)
+        result = await app_state.salesforce_client.test_connection()
+
+        if result.get("connected"):
+            logger.info("✅ Salesforce connected successfully")
+            return create_success_response(result, "Salesforce connected successfully")
+        else:
+            return create_error_response("Salesforce connection failed", result.get("error", "Unknown error"))
+
+    except Exception as e:
+        logger.error(f"❌ Salesforce configure error: {e}")
+        return create_error_response("Configuration failed", str(e))
+
+
+@app.get("/api/salesforce/status", tags=["Salesforce"], summary="Check Salesforce Connection Status")
+async def salesforce_status():
+    """Return whether Salesforce is configured and reachable."""
+    try:
+        cfg = app_state.salesforce_client.config
+        if not cfg.is_configured():
+            return {"configured": False, "connected": False}
+
+        result = await app_state.salesforce_client.test_connection()
+        case_count = 0
+        if result.get("connected"):
+            case_count = await app_state.salesforce_client.get_case_count()
+
+        return {
+            "configured": cfg.is_configured(),
+            "connected": result.get("connected", False),
+            "instance_url": cfg.instance_url,
+            "case_count": case_count,
+            "error": result.get("error"),
+        }
+    except Exception as e:
+        logger.error(f"❌ Salesforce status error: {e}")
+        return {"configured": False, "connected": False, "error": str(e)}
+
+
+@app.get("/api/salesforce/cases", tags=["Salesforce"], summary="List Salesforce Cases")
+async def salesforce_cases(limit: int = 50, offset: int = 0, status: str = None):
+    """
+    Fetch Salesforce Cases with optional status filter.
+    Returns cases with pre-computed category/solution if already classified.
+    """
+    try:
+        if not app_state.salesforce_client.config.is_configured():
+            return create_error_response("Salesforce not configured", status_code=400)
+
+        cases = await app_state.salesforce_client.get_cases(
+            limit=limit, offset=offset, status_filter=status
+        )
+
+        # Overlay cached classifications if available
+        if app_state._salesforce_classified_cache:
+            cache_map = {c["id"]: c for c in app_state._salesforce_classified_cache}
+            for case in cases:
+                cached = cache_map.get(case["id"])
+                if cached:
+                    case["category"] = cached.get("category")
+                    case["confidence"] = cached.get("confidence")
+                    case["solution"] = cached.get("solution")
+                    case["reasoning"] = cached.get("reasoning")
+                    case["color"] = cached.get("color")
+
+        return create_success_response({"cases": cases, "count": len(cases)})
+    except Exception as e:
+        logger.error(f"❌ Salesforce cases error: {e}")
+        return create_error_response("Failed to fetch cases", str(e))
+
+
+@app.get("/api/salesforce/cases/{case_id}", tags=["Salesforce"], summary="Get Single Case with AI Solution")
+async def salesforce_case_detail(case_id: str):
+    """
+    Fetch a single Salesforce Case by Id and generate/return its AI classification + solution.
+    """
+    try:
+        if not app_state.salesforce_client.config.is_configured():
+            return create_error_response("Salesforce not configured", status_code=400)
+
+        case = await app_state.salesforce_client.get_case_by_id(case_id)
+        if not case:
+            return create_error_response("Case not found", status_code=404)
+
+        # Check cache first
+        cache_map = {c["id"]: c for c in app_state._salesforce_classified_cache}
+        cached = cache_map.get(case_id)
+        if cached:
+            case.update({k: cached[k] for k in ["category", "confidence", "solution", "reasoning", "color"] if k in cached})
+        else:
+            # Classify on demand
+            classification = await classify_and_solve(case["subject"], case["description"])
+            case.update(classification)
+
+        return create_success_response(case)
+    except Exception as e:
+        logger.error(f"❌ Salesforce case detail error: {e}")
+        return create_error_response("Failed to fetch case", str(e))
+
+
+@app.post("/api/salesforce/classify", tags=["Salesforce"], summary="Batch Classify Salesforce Cases with AI")
+async def salesforce_classify(limit: int = 100):
+    """
+    Fetch up to `limit` Cases and run AI classification + solution generation on all of them.
+    Results are cached in memory for subsequent /cases requests.
+    """
+    try:
+        if not app_state.salesforce_client.config.is_configured():
+            return create_error_response("Salesforce not configured", status_code=400)
+
+        logger.info(f"🤖 Starting Salesforce batch classification (limit={limit})...")
+        cases = await app_state.salesforce_client.get_cases(limit=limit)
+        classified = await batch_classify(cases)
+
+        # Store in app state cache
+        app_state._salesforce_classified_cache = classified
+
+        # Build category distribution
+        distribution: Dict[str, int] = {}
+        for c in classified:
+            cat = c.get("category") or "Uncategorized"
+            distribution[cat] = distribution.get(cat, 0) + 1
+
+        logger.info(f"✅ Classified {len(classified)} Salesforce cases")
+        return create_success_response({
+            "classified_count": len(classified),
+            "distribution": distribution,
+            "cases": classified,
+        }, f"Successfully classified {len(classified)} cases")
+
+    except Exception as e:
+        logger.error(f"❌ Salesforce classify error: {e}")
+        return create_error_response("Classification failed", str(e))
+
+
+@app.get("/api/salesforce/metrics", tags=["Salesforce"], summary="Salesforce Case Metrics")
+async def salesforce_metrics():
+    """
+    Return summary metrics: total cases, open cases, classified count,
+    unclassified count, and category distribution.
+    """
+    try:
+        if not app_state.salesforce_client.config.is_configured():
+            return create_error_response("Salesforce not configured", status_code=400)
+
+        total = await app_state.salesforce_client.get_case_count()
+        open_count = await app_state.salesforce_client.get_case_count(status_filter="Open")
+
+        classified_count = len(app_state._salesforce_classified_cache)
+        unclassified_count = max(0, total - classified_count)
+
+        distribution: Dict[str, int] = {}
+        for c in app_state._salesforce_classified_cache:
+            cat = c.get("category") or "Uncategorized"
+            distribution[cat] = distribution.get(cat, 0) + 1
+
+        return create_success_response({
+            "total_cases": total,
+            "open_cases": open_count,
+            "classified_cases": classified_count,
+            "unclassified_cases": unclassified_count,
+            "category_distribution": distribution,
+            "categories": get_categories(),
+            "category_colors": get_category_colors(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Salesforce metrics error: {e}")
+        return create_error_response("Failed to fetch metrics", str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

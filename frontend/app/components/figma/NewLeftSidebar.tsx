@@ -5,44 +5,32 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { ScrollArea } from '../ui/scroll-area'
-import { 
-  Bot, 
-  BarChart3, 
-  Settings, 
-  Circle,
+import {
+  Bot,
+  BarChart3,
+  Settings,
   Zap,
   Sparkles,
-  Wifi,
   WifiOff,
-  Crown,
   Users,
   Target,
-  RefreshCw,
   TrendingUp,
   Shield,
   Database,
-  Cloud,
   Workflow,
-  Layers,
-  Command,
-  Terminal,
-  Monitor,
-  Server,
   CheckCircle,
   X,
   Globe,
-  Palette,
-  Sun,
-  MoonStar,
   Plug,
   ChevronDown,
   ChevronRight,
   FileText,
   Code,
-  GitBranch
+  GitBranch,
+  Ticket
 } from 'lucide-react'
+import { FalconXLogo, MUSTARD, OLIVE } from '../ui/FalconXLogo'
 import { useRouter } from 'next/navigation'
-import { ThemeSelector } from '../ui/ThemeSelector'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import type { ActiveView } from './NewFigmaApp'
@@ -65,11 +53,11 @@ interface NewLeftSidebarProps {
   onQuickAction: (prompt: string) => void
 }
 
-export function NewLeftSidebar({ 
-  activeView, 
-  setActiveView, 
-  connections, 
-  toggleConnection, 
+export function NewLeftSidebar({
+  activeView,
+  setActiveView,
+  connections,
+  toggleConnection,
   hasActiveConnections,
   setShowSettings,
   theme,
@@ -88,12 +76,12 @@ export function NewLeftSidebar({
   const [insightsExpanded, setInsightsExpanded] = useState(false)
   // Removed tcoeExpanded - now QA Metrics is a separate top-level navigation item
   const [showWelcome, setShowWelcome] = useState(true)
-  const [showThemeSelector, setShowThemeSelector] = useState(false)
   const [metricsExpanded, setMetricsExpanded] = useState(false)
-  
+
   // Theme context
   const { currentTheme, isDarkMode, toggleDarkMode } = useTheme()
   const { settings, isLoaded } = useSettings()
+  const { primary, secondary, surface, text, textSecondary, border, background, error } = currentTheme.colors
 
   // Initialize client-side state
   useEffect(() => {
@@ -106,7 +94,7 @@ export function NewLeftSidebar({
     const timer = setTimeout(() => {
       setShowWelcome(false)
     }, 3000)
-    
+
     return () => clearTimeout(timer)
   }, [])
 
@@ -117,28 +105,24 @@ export function NewLeftSidebar({
       subtext: "Performance",
       icon: BarChart3,
       prompt: "Analyze team performance metrics and productivity trends",
-      color: "primary"
     },
     {
       label: "Insights",
       subtext: "Team",
       icon: Users,
       prompt: "Provide insights about team workload and collaboration patterns",
-      color: "from-purple-500 to-pink-500"
     },
     {
       label: "Track",
       subtext: "Goals",
       icon: Target,
       prompt: "Track OKRs and KPIs progress across the organization",
-      color: "secondary"
     },
     {
       label: "Plan",
       subtext: "Sprints",
       icon: Workflow,
       prompt: "Help organize and plan agile sprints and project timelines",
-      color: "from-orange-500 to-red-500"
     }
   ]
 
@@ -171,11 +155,11 @@ export function NewLeftSidebar({
       if (connectionIndex !== -1) {
         toggleConnection(connectionIndex)
       }
-      
+
       // Clear saved configuration from localStorage
       const configKey = `${connectionType}-config`
       localStorage.removeItem(configKey)
-      
+
       // Show success message
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 3000)
@@ -188,60 +172,40 @@ export function NewLeftSidebar({
 
   return (
     <>
-      <aside className={`w-64 border-r flex flex-col h-full overflow-hidden transition-all duration-500 ease-in-out ${
-        isDarkMode
-          ? 'bg-[#0D0D14] border-white/[0.06]'
-          : 'bg-white border-gray-200'
-      }`}>
+      {/* Sidebar — bg-card with border-right only, no shadow */}
+      <aside
+        className="w-64 flex flex-col h-full overflow-hidden transition-all duration-500 ease-in-out"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderRight: '1px solid var(--border)',
+          fontFamily: 'var(--font)',
+        }}
+      >
         {/* Header */}
-        <div className={`p-5 border-b transition-all duration-300 ${
-          isDarkMode ? 'border-white/[0.06]' : 'border-gray-200'
-        }`}>
-          <div className="flex items-center space-x-3">
-            <div 
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: currentTheme.colors.primary }}
-            >
-              <img 
-                src="/company-logo.png" 
-                alt="FalconX Logo" 
-                className="w-8 h-8 object-contain"
-              />
-            </div>
-            <div>
-              <h2 
-                key={`sidebar-title-${currentTheme.name}-${isDarkMode}`}
-                className="text-base font-medium transition-colors duration-300"
-                style={{
-                  color: currentTheme.colors.primary,
-                  background: `linear-gradient(90deg, ${currentTheme.colors.primary}, ${currentTheme.colors.secondary})`,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                  textRendering: 'optimizeLegibility',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
-                }}
-              >FalconX</h2>
-              <p className={`text-xs transition-colors duration-300 ${
-                isDarkMode ? 'text-gray-400' : 'text-gray-600'
-              }`}>FalconX</p>
-            </div>
-          </div>
-          
+        <div className="p-5" style={{ borderBottom: '1px solid var(--border)' }}>
+          <FalconXLogo size={28} color={MUSTARD} textColor={text} showText={true} />
+          <p
+            className="mt-1 ml-9 font-medium tracking-wider uppercase"
+            style={{ color: MUSTARD, opacity: 0.9, fontSize: '10px', letterSpacing: '0.08em' }}
+          >
+            LEADERSHIP ENGINE
+          </p>
+
           <AnimatePresence>
             {showWelcome && (
-              <motion.div 
+              <motion.div
                 className="mt-4"
                 initial={{ opacity: 1 }}
                 animate={{ opacity: 1 }}
-                exit={{ 
+                exit={{
                   opacity: 0,
                   transition: { duration: 1, ease: "easeOut" }
                 }}
               >
-                <p className="text-sm text-gray-600">Welcome back,</p>
-                <p className="text-sm font-medium text-black">{isLoaded ? settings.userProfile.name : "User"}! 👋</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Welcome back,</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {isLoaded ? settings.userProfile.name : "User"}! 👋
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -251,184 +215,182 @@ export function NewLeftSidebar({
           <div className="p-4 space-y-6">
             {/* Navigation */}
             <div className="space-y-2">
-              <h4 className={`text-[10px] font-semibold uppercase tracking-widest mb-2 px-1 ${
-                isDarkMode ? 'text-slate-600' : 'text-gray-400'
-              }`}>
+              {/* Section label: text-hint, uppercase, 11px, letter-spacing 0.07em */}
+              <h4
+                className="font-semibold uppercase px-1"
+                style={{
+                  color: 'var(--text-hint)',
+                  fontSize: '11px',
+                  letterSpacing: '0.07em',
+                  marginBottom: '8px',
+                }}
+              >
                 Navigation
               </h4>
-              
+
               {/* Work Buddy */}
-              <button
+              <NavButton
+                active={activeView === 'copilot'}
                 onClick={() => setActiveView('copilot')}
-                className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-all duration-200 group relative ${
-                  activeView === 'copilot'
-                    ? isDarkMode
-                      ? 'bg-indigo-500/10 text-white'
-                      : 'bg-indigo-50 text-indigo-700'
-                    : isDarkMode
-                      ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+                primary={primary}
               >
-                {activeView === 'copilot' && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-500 rounded-r-full" />
-                )}
-                <Bot className={`w-4.5 h-4.5 flex-shrink-0 transition-colors ${activeView === 'copilot' ? 'text-indigo-400' : ''}`} />
+                <Bot className="w-4 h-4 flex-shrink-0" style={{ color: activeView === 'copilot' ? primary : 'var(--text-secondary)' }} />
                 <div className="text-left min-w-0">
                   <div className="text-sm font-medium leading-none">Work Buddy</div>
-                  <div className="text-[11px] opacity-60 mt-0.5">AI Assistant</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>AI Assistant</div>
                 </div>
-              </button>
+              </NavButton>
 
-              {/* Insights - Converted to Dropdown */}
+              {/* Insights — Collapsible */}
               <div className="space-y-0.5">
-                <button
-                  onClick={() => setInsightsExpanded(!insightsExpanded)}
-                  className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-all duration-200 group relative ${
-                    activeView === 'insights' || activeView === 'github-insights'
-                      ? isDarkMode
-                        ? 'bg-indigo-500/10 text-white'
-                        : 'bg-indigo-50 text-indigo-700'
-                      : isDarkMode
-                        ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  {(activeView === 'insights' || activeView === 'github-insights') && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-500 rounded-r-full" />
-                  )}
-                  <BarChart3 className={`w-4 h-4 flex-shrink-0 ${activeView === 'insights' || activeView === 'github-insights' ? 'text-indigo-400' : ''}`} />
-                  <div className="text-left flex-1 min-w-0">
-                    <div className="text-sm font-medium leading-none">Insights</div>
-                    <div className="text-[11px] opacity-60 mt-0.5">Analytics</div>
-                  </div>
-                  {insightsExpanded
-                    ? <ChevronDown className="w-3.5 h-3.5 opacity-50" />
-                    : <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-                  }
-                </button>
+                {(() => {
+                  const insightsActive = activeView === 'insights' || activeView === 'github-insights'
+                  return (
+                    <>
+                      <NavButton
+                        active={insightsActive}
+                        onClick={() => setInsightsExpanded(!insightsExpanded)}
+                        primary={primary}
+                      >
+                        <BarChart3 className="w-4 h-4 flex-shrink-0" style={{ color: insightsActive ? primary : 'var(--text-secondary)' }} />
+                        <div className="text-left flex-1 min-w-0">
+                          <div className="text-sm font-medium leading-none">Insights</div>
+                          <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Analytics</div>
+                        </div>
+                        {insightsExpanded
+                          ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                          : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                        }
+                      </NavButton>
 
-                {insightsExpanded && (
-                  <div className="ml-7 pl-3 border-l border-white/[0.06] space-y-0.5">
-                    {/* Jira Insights */}
-                    <button
-                      onClick={() => setActiveView('insights')}
-                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
-                        activeView === 'insights'
-                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
-                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Database className="w-3.5 h-3.5 flex-shrink-0" />
-                      Jira Insights
-                    </button>
+                      {insightsExpanded && (
+                        <div
+                          className="ml-7 pl-3 space-y-0.5"
+                          style={{ borderLeft: '1px solid var(--border)' }}
+                        >
+                          <SubNavButton
+                            active={activeView === 'insights'}
+                            onClick={() => setActiveView('insights')}
+                            primary={primary}
+                          >
+                            <Database className="w-3.5 h-3.5 flex-shrink-0" />
+                            Jira Insights
+                          </SubNavButton>
 
-                    {/* GitHub Insights */}
-                    <button
-                      onClick={() => setActiveView('github-insights')}
-                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
-                        activeView === 'github-insights'
-                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
-                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Code className="w-3.5 h-3.5 flex-shrink-0" />
-                      GitHub Insights
-                    </button>
-                  </div>
-                )}
+                          <SubNavButton
+                            active={activeView === 'github-insights'}
+                            onClick={() => setActiveView('github-insights')}
+                            primary={primary}
+                          >
+                            <Code className="w-3.5 h-3.5 flex-shrink-0" />
+                            GitHub Insights
+                          </SubNavButton>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
-              {/* Metrics - Collapsible Section */}
+              {/* Salesforce — Separate top-level */}
+              <NavButton
+                active={activeView === 'salesforce-insights'}
+                onClick={() => setActiveView('salesforce-insights')}
+                primary={primary}
+              >
+                <Ticket className="w-4 h-4 flex-shrink-0" style={{ color: activeView === 'salesforce-insights' ? primary : 'var(--text-secondary)' }} />
+                <div className="text-left min-w-0">
+                  <div className="text-sm font-medium leading-none">Salesforce</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>CRM Insights</div>
+                </div>
+              </NavButton>
+
+              {/* Metrics — Collapsible */}
               <div className="space-y-0.5">
-                <button
-                  onClick={() => setMetricsExpanded(!metricsExpanded)}
-                  className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-all duration-200 relative ${
-                    ['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView)
-                      ? isDarkMode ? 'bg-indigo-500/10 text-white' : 'bg-indigo-50 text-indigo-700'
-                      : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  {['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView) && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-500 rounded-r-full" />
-                  )}
-                  <TrendingUp className={`w-4 h-4 flex-shrink-0 ${['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView) ? 'text-indigo-400' : ''}`} />
-                  <div className="text-left flex-1 min-w-0">
-                    <div className="text-sm font-medium leading-none">Metrics</div>
-                    <div className="text-[11px] opacity-60 mt-0.5">Performance</div>
-                  </div>
-                  {metricsExpanded ? <ChevronDown className="w-3.5 h-3.5 opacity-50" /> : <ChevronRight className="w-3.5 h-3.5 opacity-50" />}
-                </button>
+                {(() => {
+                  const metricsActive = ['tcoe-report', 'qa-metrics', 'kpi-metrics'].includes(activeView)
+                  return (
+                    <>
+                      <NavButton
+                        active={metricsActive}
+                        onClick={() => setMetricsExpanded(!metricsExpanded)}
+                        primary={primary}
+                      >
+                        <TrendingUp className="w-4 h-4 flex-shrink-0" style={{ color: metricsActive ? primary : 'var(--text-secondary)' }} />
+                        <div className="text-left flex-1 min-w-0">
+                          <div className="text-sm font-medium leading-none">Metrics</div>
+                          <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Performance</div>
+                        </div>
+                        {metricsExpanded
+                          ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                          : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                        }
+                      </NavButton>
 
-                {metricsExpanded && (
-                  <div className="ml-7 pl-3 border-l border-white/[0.06] space-y-0.5">
-                    {/* TCOE Metrics */}
-                    <button
-                      onClick={() => setActiveView('tcoe-report')}
-                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
-                        activeView === 'tcoe-report'
-                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
-                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Shield className="w-3.5 h-3.5 flex-shrink-0" />
-                      TCOE Metrics
-                    </button>
+                      {metricsExpanded && (
+                        <div
+                          className="ml-7 pl-3 space-y-0.5"
+                          style={{ borderLeft: '1px solid var(--border)' }}
+                        >
+                          <SubNavButton
+                            active={activeView === 'tcoe-report'}
+                            onClick={() => setActiveView('tcoe-report')}
+                            primary={primary}
+                          >
+                            <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+                            TCOE Metrics
+                          </SubNavButton>
 
-                    {/* QE Metrics */}
-                    <button
-                      onClick={() => setActiveView('qa-metrics')}
-                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
-                        activeView === 'qa-metrics'
-                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
-                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <BarChart3 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>QE Metrics</span>
-                    </button>
+                          <SubNavButton
+                            active={activeView === 'qa-metrics'}
+                            onClick={() => setActiveView('qa-metrics')}
+                            primary={primary}
+                          >
+                            <BarChart3 className="w-3.5 h-3.5 flex-shrink-0" />
+                            QE Metrics
+                          </SubNavButton>
 
-                    {/* KPI Metrics */}
-                    <button
-                      onClick={() => setActiveView('kpi-metrics')}
-                      className={`w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-all duration-200 ${
-                        activeView === 'kpi-metrics'
-                          ? isDarkMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
-                          : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Target className="w-3.5 h-3.5 flex-shrink-0" />
-                      KPI Metrics
-                    </button>
-                  </div>
-                )}
+                          <SubNavButton
+                            active={activeView === 'kpi-metrics'}
+                            onClick={() => setActiveView('kpi-metrics')}
+                            primary={primary}
+                          >
+                            <Target className="w-3.5 h-3.5 flex-shrink-0" />
+                            KPI Metrics
+                          </SubNavButton>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
 
             {/* Integrations */}
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <h4 className={`text-[10px] font-semibold uppercase tracking-widest ${
-                  isDarkMode ? 'text-slate-600' : 'text-gray-400'
-                }`}>
+                <h4
+                  className="font-semibold uppercase"
+                  style={{
+                    color: 'var(--text-hint)',
+                    fontSize: '11px',
+                    letterSpacing: '0.07em',
+                  }}
+                >
                   Integrations
                 </h4>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setShowThemeSelector(true)}
-                    className={`h-5 w-5 flex items-center justify-center rounded transition-colors ${isDarkMode ? 'text-slate-600 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    <Palette className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
-                    className={`h-5 w-5 flex items-center justify-center rounded transition-colors ${isDarkMode ? 'text-slate-600 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    {integrationsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
+                  className="h-5 w-5 flex items-center justify-center rounded transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {integrationsExpanded
+                    ? <ChevronDown className="w-3 h-3" />
+                    : <ChevronRight className="w-3 h-3" />
+                  }
+                </button>
               </div>
-              
+
               {integrationsExpanded && (
                 <div className="space-y-0.5">
                   {[
@@ -440,33 +402,15 @@ export function NewLeftSidebar({
                     const conn = connections.find(c => c.name === name)
                     const isConnected = conn?.status === 'connected'
                     return (
-                      <div
+                      <IntegrationRow
                         key={name}
-                        className={`flex items-center justify-between px-3 h-11 rounded-xl transition-all duration-200 ${
-                          coming ? 'opacity-40 cursor-default' : ''
-                        } ${isDarkMode ? 'hover:bg-white/[0.04]' : 'hover:bg-gray-50'}`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Icon className={`w-4 h-4 flex-shrink-0 ${
-                            isConnected ? 'text-indigo-400' : isDarkMode ? 'text-slate-500' : 'text-gray-400'
-                          }`} />
-                          <div className="min-w-0">
-                            <div className={`text-sm font-medium truncate ${
-                              isDarkMode ? isConnected ? 'text-white' : 'text-slate-300' : isConnected ? 'text-indigo-700' : 'text-gray-700'
-                            }`}>{name}</div>
-                            <div className={`text-[11px] truncate ${isDarkMode ? 'text-slate-600' : 'text-gray-400'}`}>{label}</div>
-                          </div>
-                        </div>
-                        {coming ? (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${isDarkMode ? 'border-white/10 text-slate-500' : 'border-gray-200 text-gray-400'}`}>
-                            Soon
-                          </span>
-                        ) : (
-                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                            isConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-slate-600'
-                          }`} />
-                        )}
-                      </div>
+                        name={name}
+                        label={label}
+                        Icon={Icon}
+                        isConnected={isConnected}
+                        coming={coming}
+                        primary={primary}
+                      />
                     )
                   })}
                 </div>
@@ -478,7 +422,8 @@ export function NewLeftSidebar({
               {!hasActiveConnections && (
                 <button
                   onClick={() => setShowSettings(true)}
-                  className="w-full h-9 flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all duration-200 active:scale-[0.98]"
+                  className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-opacity duration-200 active:scale-[0.98] hover:opacity-90"
+                  style={{ backgroundColor: primary, color: '#000000' }}
                 >
                   <Plug className="w-3.5 h-3.5" />
                   Connect Integrations
@@ -488,11 +433,14 @@ export function NewLeftSidebar({
                 <div className="space-y-1.5">
                   <button
                     onClick={() => setShowSettings(true)}
-                    className={`w-full h-9 flex items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
-                      isDarkMode
-                        ? 'border-white/10 text-slate-300 hover:text-white hover:bg-white/[0.04] hover:border-white/20'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
+                    className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-colors duration-200 active:scale-[0.98]"
+                    style={{
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-primary)',
+                      backgroundColor: 'transparent',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
                     <Settings className="w-3.5 h-3.5" />
                     Manage
@@ -504,11 +452,14 @@ export function NewLeftSidebar({
                         try { await fetch('http://localhost:8000/api/confluence/disconnect', { method: 'POST' }) } catch {}
                         try { toggleConnection(-1) } catch {}
                       }}
-                      className={`w-full h-9 flex items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
-                        isDarkMode
-                          ? 'border-red-500/20 text-red-400 hover:bg-red-500/10 hover:border-red-500/40'
-                          : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
-                      }`}
+                      className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-colors duration-200 active:scale-[0.98]"
+                      style={{
+                        border: '1px solid var(--red)',
+                        color: 'var(--red)',
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.08)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                     >
                       <WifiOff className="w-3.5 h-3.5" />
                       Disconnect All
@@ -520,9 +471,14 @@ export function NewLeftSidebar({
 
             {/* Quick Actions */}
             <div className="space-y-2">
-              <h4 className={`text-[10px] font-semibold uppercase tracking-widest px-1 ${
-                isDarkMode ? 'text-slate-600' : 'text-gray-400'
-              }`}>
+              <h4
+                className="font-semibold uppercase px-1"
+                style={{
+                  color: 'var(--text-hint)',
+                  fontSize: '11px',
+                  letterSpacing: '0.07em',
+                }}
+              >
                 Quick Actions
               </h4>
               <div className="space-y-0.5">
@@ -530,22 +486,20 @@ export function NewLeftSidebar({
                   <button
                     key={action.label}
                     onClick={() => onQuickAction(action.prompt)}
-                    className={`w-full flex items-center gap-3 h-10 px-3 rounded-xl text-left transition-all duration-200 group ${
-                      isDarkMode
-                        ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
+                    className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-left transition-colors duration-200"
+                    style={{ color: 'var(--text-primary)', backgroundColor: 'transparent' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-                      isDarkMode ? 'bg-white/[0.06] group-hover:bg-indigo-500/20' : 'bg-gray-100 group-hover:bg-indigo-50'
-                    }`}>
-                      <action.icon className={`w-3.5 h-3.5 transition-colors duration-200 ${
-                        isDarkMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-gray-500 group-hover:text-indigo-600'
-                      }`} />
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: 'var(--bg-surface)' }}
+                    >
+                      <action.icon className="w-3.5 h-3.5" style={{ color: primary }} />
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-medium leading-none truncate">{action.label}</div>
-                      <div className={`text-[11px] mt-0.5 truncate ${isDarkMode ? 'text-slate-600' : 'text-gray-400'}`}>{action.subtext}</div>
+                      <div className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>{action.subtext}</div>
                     </div>
                   </button>
                 ))}
@@ -553,14 +507,15 @@ export function NewLeftSidebar({
             </div>
           </div>
         </ScrollArea>
-        
+
         {/* Footer */}
-        <div className={`px-4 py-3 border-t ${isDarkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+        <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={() => setShowAboutUs(true)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-              isDarkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-200"
+            style={{ color: 'var(--text-secondary)', backgroundColor: 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
           >
             <Globe className="w-4 h-4 flex-shrink-0" />
             <span className="text-sm font-medium">About Us</span>
@@ -568,292 +523,383 @@ export function NewLeftSidebar({
         </div>
       </aside>
 
-      {/* Animated Connected Popup */}
+      {/* Animated Connected Popup — border only, no shadow */}
       <AnimatePresence>
         {showConnectedPopup && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: -20 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50"
           >
-            <div className="bg-[#16161F] border border-white/10 rounded-2xl p-4 shadow-2xl shadow-black/40 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+            <div
+              className="rounded-2xl p-4 flex items-center gap-3"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{
+                  backgroundColor: 'var(--green-bg)',
+                  border: '1px solid var(--green)',
+                }}
+              >
+                <CheckCircle className="w-5 h-5" style={{ color: 'var(--green)' }} />
               </div>
               <div>
-                <h3 className="font-semibold text-sm text-white">
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
                   {showConnectedPopup === 'atlassian' ? 'Atlassian' :
                    showConnectedPopup === 'github' ? 'GitHub' : 'Integration'} Connected
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Integration is now active</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Integration is now active</p>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* About Us Modal */}
+      {/* FalconX About Modal */}
       <AnimatePresence>
         {showAboutUs && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
             onClick={() => setShowAboutUs(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="relative w-full max-w-4xl max-h-[90vh] rounded-lg shadow-2xl border overflow-hidden transition-colors duration-300"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -24 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-3xl max-h-[88vh] rounded-3xl overflow-hidden flex flex-col"
               style={{
-                backgroundColor: isDarkMode ? currentTheme.colors.surface : currentTheme.colors.background,
-                borderColor: currentTheme.colors.border
+                backgroundColor: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div 
-                className="flex items-center justify-between p-6 border-b transition-colors duration-300"
-                style={{
-                  backgroundColor: `${currentTheme.colors.primary}10`,
-                  borderColor: currentTheme.colors.border
-                }}
+              {/* Modal Header — no gradient */}
+              <div
+                className="flex items-center justify-between p-6 shrink-0"
+                style={{ borderBottom: '1px solid var(--border)' }}
               >
-                <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-300"
-                    style={{ backgroundColor: currentTheme.colors.primary }}
+                <motion.div
+                  className="flex items-center space-x-3"
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1, duration: 0.4 }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                    style={{ backgroundColor: primary }}
                   >
-                    <span 
-                      className="font-bold text-lg transition-colors duration-300"
-                      style={{ color: 'white' }}
-                    >T</span>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 3L21 12L13 14L10 21L3 3Z" fill="#000000" />
+                    </svg>
                   </div>
                   <div>
-                    <h2 
-                      className="text-xl font-bold transition-colors duration-300"
-                      style={{ color: currentTheme.colors.text }}
-                    >
-                      About FalconX Solutions
-                    </h2>
-                    <p 
-                      className="text-sm transition-colors duration-300"
-                      style={{ color: currentTheme.colors.textSecondary }}
-                    >
-                      Leadership Engine Excellence
-                    </p>
+                    <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>FalconX</h2>
+                    <p className="text-xs font-medium" style={{ color: primary }}>Leadership Engine — AI Leadership Platform</p>
                   </div>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                </motion.div>
+                <button
                   onClick={() => setShowAboutUs(false)}
-                  className="transition-colors duration-300"
-                  style={{
-                    color: currentTheme.colors.textSecondary
-                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-200"
+                  style={{ color: 'var(--text-secondary)', backgroundColor: 'transparent' }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = currentTheme.colors.text;
-                    e.currentTarget.style.backgroundColor = `${currentTheme.colors.primary}10`;
+                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = currentTheme.colors.textSecondary;
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
                   }}
                 >
                   <X className="w-5 h-5" />
-                </Button>
+                </button>
               </div>
-              
-              {/* Content */}
-              <div 
-                className="flex-1 overflow-y-auto p-6 transition-colors duration-300"
-                style={{
-                  backgroundColor: isDarkMode ? currentTheme.colors.surface : currentTheme.colors.background
-                }}
-              >
-                <div className="space-y-6">
-                  {/* Company Overview */}
-                  <div>
-                    <h3 
-                      className="text-lg font-semibold mb-3 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.text }}
-                    >
-                      Our Mission
-                    </h3>
-                    <p 
-                      className="text-sm leading-relaxed transition-colors duration-300"
-                      style={{ color: currentTheme.colors.textSecondary }}
-                    >
-                      FalconX Solutions specializes in assisting enterprises to develop new platforms, 
-                      scale existing business models, and expand into new markets with rapid time-to-market strategies. 
-                      Our name, cdk, stands for <strong>Transformation, Automation, and Optimization</strong>, 
-                      reflecting our core philosophy and value proposition.
-                    </p>
-                  </div>
 
-                  {/* Services */}
-                  <div>
-                    <h3 
-                      className="text-lg font-semibold mb-3 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.text }}
-                    >
-                      Our Services
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[
-                        { title: "Product Engineering", desc: "Agile services to fuel innovation and accelerate time to market" },
-                        { title: "Managed Services", desc: "Outcome-based technology operations management" },
-                        { title: "Cybersecurity", desc: "Strengthen IT systems and prevent disruptions" },
-                        { title: "Payment Services", desc: "End-to-end digital payment solutions" },
-                        { title: "Digitization", desc: "Scale data models and unlock AI value" },
-                        { title: "Cloud Services", desc: "Accelerate IT modernization through cloud technologies" }
-                      ].map((service, index) => (
-                        <div 
-                          key={index} 
-                          className="p-4 rounded-lg border transition-colors duration-300"
-                          style={{
-                            backgroundColor: `${currentTheme.colors.primary}05`,
-                            borderColor: currentTheme.colors.border
-                          }}
-                        >
-                          <h4 
-                            className="font-medium text-sm mb-2 transition-colors duration-300"
-                            style={{ color: currentTheme.colors.text }}
-                          >
-                            {service.title}
-                          </h4>
-                          <p 
-                            className="text-xs transition-colors duration-300"
-                            style={{ color: currentTheme.colors.textSecondary }}
-                          >
-                            {service.desc}
-                          </p>
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-8">
+
+                {/* Why FalconX */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15, duration: 0.5 }}
+                >
+                  <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+                    Why FalconX?
+                  </h3>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    FalconX is an <strong style={{ color: primary }}>AI-powered leadership &amp; productivity intelligence</strong> platform
+                    built on the Leadership Engine platform. It transforms how engineering teams operate — replacing manual
+                    reporting with real-time data, predictive analytics, and actionable insights that flow directly
+                    into how leaders make decisions.
+                  </p>
+                </motion.div>
+
+                {/* Benefits grid */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.22, duration: 0.5 }}
+                >
+                  <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+                    What FalconX Delivers
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { icon: '⚡', title: 'Real-Time Insights', desc: 'Live sprint, velocity, and burndown data from Jira — no manual exports.' },
+                      { icon: '🔗', title: 'Jira & Confluence Integration', desc: 'Seamless sync with your existing project management and docs toolchain.' },
+                      { icon: '🐞', title: 'Defect Leakage Analysis', desc: 'Identify escape defects early, track trends, and reduce production bugs.' },
+                      { icon: '📊', title: 'Sprint Analytics', desc: 'Completion rates, carry-over risk, and predictive sprint health scores.' },
+                      { icon: '👥', title: 'Team Capacity Tracking', desc: 'Balance workload across individuals with AI-assisted capacity planning.' },
+                      { icon: '🔮', title: 'Predictive Analytics', desc: 'ML models forecast delivery risk and surface bottlenecks before they block.' },
+                    ].map((item, i) => (
+                      <motion.div
+                        key={item.title}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.28 + i * 0.06, duration: 0.4 }}
+                        className="p-4 rounded-2xl"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-xl leading-none mt-0.5">{item.icon}</span>
+                          <div>
+                            <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{item.title}</h4>
+                            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{item.desc}</p>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      </motion.div>
+                    ))}
                   </div>
+                </motion.div>
 
-                  {/* Global Presence */}
-                  <div>
-                    <h3 
-                      className="text-lg font-semibold mb-3 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.text }}
-                    >
-                      Global Presence
-                    </h3>
-                    <p 
-                      className="text-sm leading-relaxed mb-3 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.textSecondary }}
-                    >
-                      We operate across five international hubs:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {['USA', 'Canada', 'Nigeria', 'India', 'Australia'].map((country, index) => (
-                        <span 
-                          key={index}
-                          className="px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300"
-                          style={{
-                            backgroundColor: `${currentTheme.colors.primary}20`,
-                            color: currentTheme.colors.primary,
-                            borderColor: `${currentTheme.colors.primary}40`
-                          }}
+                {/* Value proposition — no gradient, use bg-card */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65, duration: 0.5 }}
+                  className="p-5 rounded-2xl"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-strong)',
+                  }}
+                >
+                  <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Value Proposition</h3>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Faster Decisions', detail: 'Leadership dashboards consolidate data from multiple tools in one view.' },
+                      { label: 'Reduced Manual Reporting', detail: 'Automated report generation saves hours of weekly data preparation.' },
+                      { label: 'Data-Driven Leadership', detail: 'Move from gut-feel management to evidence-based, AI-assisted decision making.' },
+                    ].map((vp) => (
+                      <div key={vp.label} className="flex items-start gap-3">
+                        <div
+                          className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                          style={{ backgroundColor: primary }}
                         >
-                          {country}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Values */}
-                  <div>
-                    <h3 
-                      className="text-lg font-semibold mb-3 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.text }}
-                    >
-                      Our Values
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      {['Innovation', 'Respect', 'Customer Focus', 'Community'].map((value, index) => (
-                        <div 
-                          key={index} 
-                          className="flex items-center space-x-2 p-2 rounded-lg transition-colors duration-300"
-                          style={{
-                            backgroundColor: `${currentTheme.colors.primary}05`,
-                            borderColor: currentTheme.colors.border
-                          }}
-                        >
-                          <div 
-                            className="w-2 h-2 rounded-full transition-colors duration-300"
-                            style={{ backgroundColor: currentTheme.colors.primary }}
-                          />
-                          <span 
-                            className="text-sm font-medium transition-colors duration-300"
-                            style={{ color: currentTheme.colors.text }}
-                          >
-                            {value}
-                          </span>
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                            <path d="M1 4L3.5 6.5L9 1" stroke="#000000" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </div>
-                      ))}
-                    </div>
+                        <div>
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{vp.label} — </span>
+                          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{vp.detail}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </motion.div>
 
-                  {/* Contact */}
-                  <div 
-                    className="p-4 rounded-lg border transition-colors duration-300"
+                {/* CTA */}
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.75, duration: 0.4 }}
+                  className="flex justify-center pb-2"
+                >
+                  <a
+                    href="https://www.cdkdigitalsolutions.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-semibold transition-opacity duration-200 hover:opacity-80"
                     style={{
-                      backgroundColor: `${currentTheme.colors.primary}05`,
-                      borderColor: currentTheme.colors.border
+                      backgroundColor: primary,
+                      color: '#000000',
                     }}
                   >
-                    <h3 
-                      className="text-lg font-semibold mb-2 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.text }}
-                    >
-                      Learn More
-                    </h3>
-                    <p 
-                      className="text-sm mb-3 transition-colors duration-300"
-                      style={{ color: currentTheme.colors.textSecondary }}
-                    >
-                      Visit our website to explore our full range of services and solutions.
-                    </p>
-                    <a 
-                      href="https://www.cdkdigitalsolutions.com" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 text-white"
-                      style={{
-                        backgroundColor: currentTheme.colors.primary
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = currentTheme.colors.secondary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = currentTheme.colors.primary;
-                      }}
-                    >
-                      <Globe className="w-4 h-4" />
-                      <span>Visit Website</span>
-                    </a>
-                  </div>
-                </div>
+                    <Globe className="w-4 h-4" />
+                    Learn More at CDK Digital Solutions
+                  </a>
+                </motion.div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Theme Selector */}
-      <ThemeSelector 
-        isOpen={showThemeSelector} 
-        onClose={() => setShowThemeSelector(false)} 
-      />
     </>
+  )
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+/** Top-level nav button: active = bg-active, hover = bg-hover, active indicator stripe */
+function NavButton({
+  active,
+  onClick,
+  primary,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  primary: string
+  children: React.ReactNode
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  const bg = active
+    ? 'var(--bg-active)'
+    : hovered
+    ? 'var(--bg-hover)'
+    : 'transparent'
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 h-11 px-3 rounded-xl transition-colors duration-150 relative"
+      style={{
+        backgroundColor: bg,
+        color: active ? primary : 'var(--text-secondary)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {active && (
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full"
+          style={{ backgroundColor: primary }}
+        />
+      )}
+      {children}
+    </button>
+  )
+}
+
+/** Sub-nav button (inside collapsed section) */
+function SubNavButton({
+  active,
+  onClick,
+  primary,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  primary: string
+  children: React.ReactNode
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  const bg = active
+    ? 'var(--bg-active)'
+    : hovered
+    ? 'var(--bg-hover)'
+    : 'transparent'
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2 h-9 px-2 rounded-lg text-sm transition-colors duration-150"
+      style={{
+        backgroundColor: bg,
+        color: active ? primary : 'var(--text-secondary)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Integration row with status dot */
+function IntegrationRow({
+  name,
+  label,
+  Icon,
+  isConnected,
+  coming,
+  primary,
+}: {
+  name: string
+  label: string
+  Icon: React.ElementType
+  isConnected: boolean | undefined
+  coming: boolean
+  primary: string
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  // Status dot color: cool blue = connected, red = disconnected, gray = coming-soon (no green)
+  const dotColor = coming
+    ? 'var(--text-muted)'
+    : isConnected
+    ? 'var(--accent-cool)'
+    : 'var(--red)'
+
+  return (
+    <div
+      className="flex items-center justify-between px-3 h-11 rounded-xl transition-colors duration-150"
+      style={{
+        opacity: coming ? 0.4 : 1,
+        cursor: coming ? 'default' : 'default',
+        backgroundColor: hovered && !coming ? 'var(--bg-hover)' : 'transparent',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <Icon
+          className="w-4 h-4 flex-shrink-0"
+          style={{ color: isConnected ? primary : 'var(--text-secondary)' }}
+        />
+        <div className="min-w-0">
+          <div
+            className="text-sm font-medium truncate"
+            style={{ color: isConnected ? primary : 'var(--text-primary)' }}
+          >
+            {name}
+          </div>
+          <div className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{label}</div>
+        </div>
+      </div>
+      {coming ? (
+        <span
+          className="text-[10px] px-2 py-0.5 rounded-full"
+          style={{
+            border: '1px solid var(--border)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          Soon
+        </span>
+      ) : (
+        <div
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: dotColor }}
+        />
+      )}
+    </div>
   )
 }

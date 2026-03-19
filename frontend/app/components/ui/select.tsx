@@ -9,18 +9,18 @@ interface SelectProps {
   children: React.ReactNode
 }
 
-interface SelectTriggerProps {
+interface SelectTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   className?: string
   children: React.ReactNode
 }
 
-interface SelectContentProps {
+interface SelectContentProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string
   children: React.ReactNode
   searchable?: boolean
 }
 
-interface SelectItemProps {
+interface SelectItemProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string
   className?: string
   children: React.ReactNode
@@ -145,7 +145,7 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
         type="button"
         data-select-trigger
         className={cn(
-          "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 [border-color:var(--border-subtle)] [background:var(--bg-secondary)] [color:var(--text-primary)]",
           className
         )}
         onClick={(e) => {
@@ -156,7 +156,7 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
         {...props}
       >
         {children}
-        <ChevronDown className="h-4 w-4 opacity-50 text-gray-500 dark:text-gray-400" />
+        <ChevronDown className="h-4 w-4 opacity-50 [color:var(--text-muted)]" />
       </button>
     )
   }
@@ -172,14 +172,14 @@ const SelectValue = ({ placeholder = "Select an option..." }: SelectValueProps) 
   const displayText = selectedItem ? selectedItem.label : (context.value || placeholder)
 
   return (
-    <span className={`text-sm ${context.value ? "text-gray-900 dark:text-gray-100 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
+    <span className={`text-sm ${context.value ? "font-medium [color:var(--text-primary)]" : "[color:var(--text-muted)]"}`}>
       {displayText}
     </span>
   )
 }
 
 const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
-  ({ className, children, searchable = true, ...props }, ref) => {
+  ({ className, children, searchable = true, style: _customStyle, ...restProps }, ref) => {
     const context = React.useContext(SelectContext)
     if (!context) throw new Error("SelectContent must be used within Select")
     const contentRef = React.useRef<HTMLDivElement>(null)
@@ -304,9 +304,9 @@ const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
           ref={contentRef}
           className={cn(
             "fixed min-w-[8rem] rounded-lg border-2 shadow-2xl z-[10000]",
-            "bg-white dark:bg-gray-800",
-            "border-gray-200 dark:border-gray-700",
-            "text-gray-900 dark:text-gray-100",
+            "[background:var(--bg-secondary)]",
+            "[border-color:var(--border-subtle)]",
+            "[color:var(--text-primary)]",
             "backdrop-blur-sm",
             className
           )}
@@ -322,21 +322,21 @@ const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
             minWidth: '200px',
             isolation: 'isolate',
             contain: 'layout style paint',
-            ...(props as any).style,
-            zIndex: (props as any).style?.zIndex || 10000,
+            ..._customStyle,
+            zIndex: _customStyle?.zIndex || 10000,
             pointerEvents: 'auto',
-            backgroundColor: (props as any).style?.backgroundColor || undefined,
+            backgroundColor: _customStyle?.backgroundColor || undefined,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             overflow: 'hidden'
           }}
           onClick={(e) => e.stopPropagation()}
-          {...props}
+          {...restProps}
         >
         {/* Search Box */}
         {searchable && (
-          <div className="border-b border-gray-200 dark:border-gray-700 p-2 flex-shrink-0">
+          <div className="border-b p-2 flex-shrink-0 [border-color:var(--border-subtle)]">
             <div className="relative flex items-center">
-              <Search className="absolute left-2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-2 h-4 w-4 pointer-events-none [color:var(--text-muted)]" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -353,7 +353,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
                     context.setSearchQuery("")
                   }
                 }}
-                className="w-full pl-8 pr-2 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-8 pr-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 [background:var(--bg-primary)] [border-color:var(--border-subtle)] [color:var(--text-primary)] placeholder:[color:var(--text-muted)] focus:ring-[var(--accent-primary)]"
               />
               {context.searchQuery && (
                 <button
@@ -361,7 +361,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
                     context.setSearchQuery("")
                     searchInputRef.current?.focus()
                   }}
-                  className="absolute right-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                  className="absolute right-2 p-1 rounded hover:opacity-80 [background:var(--border-subtle)]"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -431,8 +431,8 @@ const SelectItem = React.forwardRef<HTMLDivElement, SelectItemProps>(
         data-state={value === context.value ? 'checked' : 'unchecked'}
         className={cn(
           "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm transition-colors",
-          !disabled && "hover:bg-gray-100 dark:hover:bg-gray-700",
-          value === context.value ? "bg-blue-50 dark:bg-blue-900" : "text-gray-900 dark:text-gray-100",
+          !disabled && "hover:opacity-90",
+          value === context.value ? "[background:var(--glass-bg)] [color:var(--accent-primary)]" : "[color:var(--text-primary)]",
           disabled && "pointer-events-none opacity-50 cursor-not-allowed",
           className
         )}
@@ -443,7 +443,7 @@ const SelectItem = React.forwardRef<HTMLDivElement, SelectItemProps>(
         {children}
         {value === context.value && (
           <div className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-            <span className="text-blue-600 dark:text-blue-400">✓</span>
+            <span className="[color:var(--accent-primary)]">✓</span>
           </div>
         )}
       </div>

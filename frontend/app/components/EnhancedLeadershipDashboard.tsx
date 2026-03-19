@@ -390,11 +390,11 @@ export function EnhancedLeadershipDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total Issues</p>
-                      <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                      <p className="text-3xl font-bold text-[var(--text-primary)]">
                         {metrics?.portfolio_summary?.total_issues || 0}
                       </p>
                     </div>
-                    <FileText className="h-8 w-8 text-green-500 group-hover:scale-110 transition-transform duration-200" />
+                    <FileText className="h-8 w-8 text-[var(--text-secondary)] group-hover:scale-110 transition-transform duration-200" />
                   </div>
                 </CardContent>
               </Card>
@@ -418,11 +418,11 @@ export function EnhancedLeadershipDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completion Rate</p>
-                      <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                      <p className="text-3xl font-bold text-[var(--text-primary)]">
                         {metrics?.portfolio_summary?.completion_rate || 0}%
                       </p>
                     </div>
-                    <Target className="h-8 w-8 text-orange-500 group-hover:scale-110 transition-transform duration-200" />
+                    <Target className="h-8 w-8 text-[var(--text-secondary)] group-hover:scale-110 transition-transform duration-200" />
                   </div>
                   <Progress 
                     value={metrics?.portfolio_summary?.completion_rate || 0} 

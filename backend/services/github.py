@@ -135,16 +135,51 @@ class GitHubClient:
             logger.error(f"❌ Unexpected error during GitHub status check: {e}", exc_info=True)
             return {"connected": False, "error": str(e)}
 
+    async def _get_all_pages(self, endpoint: str, params: Dict = None, max_pages: int = 20) -> List[Dict]:
+        """Paginate through all pages of a GitHub list endpoint (follows Link headers)."""
+        if not self._client:
+            await self.initialize()
+        all_items: List[Dict] = []
+        url = endpoint if endpoint.startswith('http') else f"{self.config.base_url}{endpoint}"
+        page_params = {**(params or {}), "per_page": 100}
+        for _ in range(max_pages):
+            try:
+                response = await self._client.get(url, headers=self._headers, params=page_params)
+                if response.status_code != 200:
+                    break
+                data = response.json()
+                if isinstance(data, list):
+                    all_items.extend(data)
+                    if len(data) < 100:
+                        break  # Last page
+                    # Follow Link: next header
+                    link_header = response.headers.get("Link", "")
+                    next_url = None
+                    for part in link_header.split(","):
+                        if 'rel="next"' in part:
+                            next_url = part.split(";")[0].strip().strip("<>")
+                            break
+                    if not next_url:
+                        break
+                    url = next_url
+                    page_params = {}  # URL already has params encoded
+                else:
+                    break
+            except Exception as e:
+                logger.error(f"❌ Pagination error: {e}")
+                break
+        return all_items
+
     async def list_repositories(self, per_page: int = 100) -> Dict[str, Any]:
-        """List repositories for the authenticated user/org."""
-        try:
-            params = {"per_page": per_page}
-            data = await self._get("/user/repos", params=params)
-            if not data:
-                return {"success": False, "repos": [], "error": "No data returned"}
-            repos = []
-            for repo in data:
-                repos.append({
+        """List ALL repositories for the authenticated user and configured org (paginated)."""
+        def _parse(raw_list: Any) -> List[Dict]:
+            if not isinstance(raw_list, list):
+                return []
+            result = []
+            for repo in raw_list:
+                if not isinstance(repo, dict):
+                    continue
+                result.append({
                     "id": repo.get("id"),
                     "name": repo.get("name"),
                     "full_name": repo.get("full_name"),
@@ -153,6 +188,38 @@ class GitHubClient:
                     "html_url": repo.get("html_url"),
                     "default_branch": repo.get("default_branch"),
                 })
+            return result
+
+        try:
+            repos: List[Dict] = []
+            seen: set = set()
+
+            # 1. Paginate through ALL org repos
+            if self.config.org:
+                org_raw = await self._get_all_pages(
+                    f"/orgs/{self.config.org}/repos",
+                    params={"type": "all", "sort": "updated"}
+                )
+                for r in _parse(org_raw):
+                    if r["full_name"] not in seen:
+                        seen.add(r["full_name"])
+                        repos.append(r)
+                logger.info(f"✅ Fetched {len(repos)} repos from org '{self.config.org}'")
+
+            # 2. Paginate through ALL user repos
+            user_raw = await self._get_all_pages(
+                "/user/repos",
+                params={"type": "all", "sort": "updated", "affiliation": "owner,collaborator,organization_member"}
+            )
+            for r in _parse(user_raw):
+                if r["full_name"] not in seen:
+                    seen.add(r["full_name"])
+                    repos.append(r)
+
+            if not repos:
+                return {"success": False, "repos": [], "error": "No repositories found. Check token permissions (needs repo/read:org scope)."}
+
+            logger.info(f"✅ Total repos available: {len(repos)}")
             return {"success": True, "repos": repos}
         except Exception as e:
             logger.error(f"❌ Failed to list repositories: {e}", exc_info=True)
@@ -191,6 +258,158 @@ class GitHubClient:
             "failed": failed,
             "success_rate": (successful / total * 100) if total > 0 else 0,
             "runs": runs[:10] # Return top 10 for display
+        }
+
+    async def get_recent_prs(self, repo: str, state: str = "all", per_page: int = 20) -> Dict[str, Any]:
+        """Get recent pull requests for a repository"""
+        owner_repo = repo if "/" in repo else f"{self.config.org}/{repo}"
+        endpoint = f"/repos/{owner_repo}/pulls"
+        params = {"state": state, "per_page": per_page, "sort": "updated", "direction": "desc"}
+        data = await self._get(endpoint, params)
+        if not isinstance(data, list):
+            return {"prs": [], "total": 0}
+        prs = []
+        for pr in data:
+            body = pr.get("body") or ""
+            prs.append({
+                "id": pr.get("number"),
+                "title": pr.get("title", "Untitled"),
+                "author": pr.get("user", {}).get("login", ""),
+                "author_avatar": pr.get("user", {}).get("avatar_url", ""),
+                "state": pr.get("state", "open"),
+                "merged": pr.get("merged_at") is not None,
+                "draft": pr.get("draft", False),
+                "head_branch": pr.get("head", {}).get("ref", ""),
+                "base_branch": pr.get("base", {}).get("ref", "main"),
+                "created_at": pr.get("created_at"),
+                "updated_at": pr.get("updated_at"),
+                "merged_at": pr.get("merged_at"),
+                "html_url": pr.get("html_url", ""),
+                "comments": pr.get("comments", 0),
+                "review_comments": pr.get("review_comments", 0),
+                "labels": [l.get("name") for l in (pr.get("labels") or [])],
+                "body_preview": body[:300].strip() if body else "",
+            })
+        return {"prs": prs, "total": len(prs)}
+
+    async def get_repo_detail(self, repo: str) -> Dict[str, Any]:
+        """
+        Fetch enriched details for a single repo:
+        - Last PR merged to default branch (main/master)
+        - Branches active in the last 7 days with commit counts
+        - Open PRs with body preview
+        """
+        import asyncio
+        owner_repo = repo if "/" in repo else f"{self.config.org}/{repo}"
+        since_week = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        # ── Run all independent initial fetches in parallel ───────────────────
+        results_initial = await asyncio.gather(
+            self._get(f"/repos/{owner_repo}"),
+            self._get_all_pages(f"/repos/{owner_repo}/pulls",
+                      params={"state": "closed", "sort": "updated", "direction": "desc"},
+                      max_pages=1),
+            self._get(f"/repos/{owner_repo}/branches", params={"per_page": 100}),
+            self._get_all_pages(f"/repos/{owner_repo}/pulls",
+                      params={"state": "open", "sort": "updated", "direction": "desc"},
+                      max_pages=1),
+            return_exceptions=True,
+        )
+        repo_info      = results_initial[0] if not isinstance(results_initial[0], Exception) else {}
+        merged_prs_raw = results_initial[1] if not isinstance(results_initial[1], Exception) else []
+        branches_raw   = results_initial[2] if not isinstance(results_initial[2], Exception) else []
+        open_prs_raw   = results_initial[3] if not isinstance(results_initial[3], Exception) else []
+
+        default_branch = repo_info.get("default_branch", "main") if isinstance(repo_info, dict) else "main"
+
+        # ── Last PR merged to default branch ──────────────────────────────────
+        last_merged_pr = None
+        if isinstance(merged_prs_raw, list):
+            for pr in merged_prs_raw:
+                if pr.get("merged_at") and pr.get("base", {}).get("ref") == default_branch:
+                    last_merged_pr = {
+                        "id": pr.get("number"),
+                        "title": pr.get("title", ""),
+                        "author": pr.get("user", {}).get("login", ""),
+                        "author_avatar": pr.get("user", {}).get("avatar_url", ""),
+                        "merged_at": pr.get("merged_at"),
+                        "head_branch": pr.get("head", {}).get("ref", ""),
+                        "html_url": pr.get("html_url", ""),
+                        "body_preview": (pr.get("body") or "")[:200].strip(),
+                    }
+                    break
+
+        # ── Active branches (last 7 days) ─────────────────────────────────────
+        # GitHub Branches API only returns commit.sha + commit.url (NOT commit.author.date).
+        # To get dates and commit counts we query commits?sha=<branch>&since=<week_ago>
+        # for the top 10 branches in parallel with a generous timeout.
+        active_branches: List[Dict] = []
+        if isinstance(branches_raw, list):
+            branch_names = [b.get("name", "") for b in branches_raw if b.get("name")][:10]
+            protected_map = {b.get("name", ""): b.get("protected", False) for b in branches_raw}
+
+            async def fetch_branch_activity(name: str) -> Optional[Dict]:
+                try:
+                    commits = await asyncio.wait_for(
+                        self._get(
+                            f"/repos/{owner_repo}/commits",
+                            params={"sha": name, "since": since_week, "per_page": 100},
+                        ),
+                        timeout=15.0,
+                    )
+                except asyncio.TimeoutError:
+                    return None
+                if not isinstance(commits, list) or len(commits) == 0:
+                    return None
+                # The commits API returns full commit objects with commit.author.date
+                last_date = commits[0].get("commit", {}).get("author", {}).get("date", "")
+                last_sha  = commits[0].get("sha", "")[:7]
+                return {
+                    "name": name,
+                    "commits_this_week": len(commits),
+                    "last_commit_date": last_date,
+                    "last_commit_sha": last_sha,
+                    "protected": protected_map.get(name, False),
+                }
+
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*[fetch_branch_activity(n) for n in branch_names], return_exceptions=True),
+                    timeout=20.0,
+                )
+                active_branches = [r for r in results if isinstance(r, dict)]
+                active_branches.sort(key=lambda x: x["commits_this_week"], reverse=True)
+            except asyncio.TimeoutError:
+                logger.warning(f"Branch activity fetch timed out for {owner_repo}, continuing without branch data")
+
+        # ── Open PRs with body ────────────────────────────────────────────────
+        open_prs = []
+        if isinstance(open_prs_raw, list):
+            for pr in open_prs_raw:
+                body = pr.get("body") or ""
+                open_prs.append({
+                    "id": pr.get("number"),
+                    "title": pr.get("title", ""),
+                    "author": pr.get("user", {}).get("login", ""),
+                    "author_avatar": pr.get("user", {}).get("avatar_url", ""),
+                    "draft": pr.get("draft", False),
+                    "head_branch": pr.get("head", {}).get("ref", ""),
+                    "base_branch": pr.get("base", {}).get("ref", default_branch),
+                    "created_at": pr.get("created_at"),
+                    "updated_at": pr.get("updated_at"),
+                    "html_url": pr.get("html_url", ""),
+                    "comments": pr.get("comments", 0),
+                    "review_comments": pr.get("review_comments", 0),
+                    "labels": [l.get("name") for l in (pr.get("labels") or [])],
+                    "body_preview": body[:400].strip() if body else "",
+                })
+
+        return {
+            "repo": owner_repo,
+            "default_branch": default_branch,
+            "last_merged_pr": last_merged_pr,
+            "active_branches": active_branches,
+            "open_prs": open_prs,
         }
 
     async def search_issues_and_prs(self, query: str, use_semantic: bool = True) -> List[Dict[str, Any]]:
