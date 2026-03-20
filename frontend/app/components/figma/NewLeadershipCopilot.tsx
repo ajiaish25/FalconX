@@ -771,22 +771,12 @@ export function NewLeadershipCopilot({
 
         {/* ═══════════════════ LEFT: Session Sidebar ═══════════════════ */}
         <div
-          className="w-56 flex-shrink-0 flex flex-col h-full min-h-0 overflow-hidden transition-all duration-200 ease-out"
-          style={{ backgroundColor: surface, borderRight: `1px solid ${border}40` }}
+          className={`flex-shrink-0 flex flex-col h-full min-h-0 overflow-hidden transition-all duration-200 ease-out ${isHistoryCollapsed ? 'w-0 opacity-0' : 'w-56 opacity-100'}`}
+          style={{ backgroundColor: surface, borderRight: isHistoryCollapsed ? 'none' : `1px solid ${border}40` }}
         >
           {/* Header */}
-          <div className="px-3 pt-4 pb-3" style={{ borderBottom: `1px solid ${border}30` }}>
-            {isHistoryCollapsed ? (
-              <button
-                onClick={() => setIsHistoryCollapsed(false)}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-all duration-150"
-                style={{ color: textSecondary, backgroundColor: `${surface}88`, border: `1px solid ${border}32` }}
-                title="Show chat history"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-                Show Chat History
-              </button>
-            ) : (
+          {!isHistoryCollapsed && (
+            <div className="px-3 pt-4 pb-3" style={{ borderBottom: `1px solid ${border}30` }}>
               <>
                 <div className="mb-3 px-1 flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: textSecondary }}>Chat History</span>
@@ -810,11 +800,11 @@ export function NewLeadershipCopilot({
                   New Chat
                 </button>
               </>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Session list */}
-          <div className="flex-1 min-h-0 overflow-y-auto py-2 wb-scroll">
+          <div className={`flex-1 min-h-0 overflow-y-auto wb-scroll ${isHistoryCollapsed ? 'py-0' : 'py-2'}`}>
             {!isHistoryCollapsed && (
               <>
                 {sessionGroups.length === 0 && (
@@ -877,6 +867,22 @@ export function NewLeadershipCopilot({
 
         {/* ═══════════════════ RIGHT: Chat Area ═══════════════════════ */}
 	        <div className="relative flex-1 flex flex-col min-w-0 h-full min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-page)' }}>
+          {isHistoryCollapsed && (
+            <button
+              onClick={() => setIsHistoryCollapsed(false)}
+              className="absolute top-3 left-4 z-20 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-all duration-150"
+              style={{
+                color: textSecondary,
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${border}30`,
+                backdropFilter: 'blur(12px)',
+              }}
+              title="Show chat history"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              Show Chat History
+            </button>
+          )}
 
           {/* Chat header */}
           <div
@@ -948,7 +954,14 @@ export function NewLeadershipCopilot({
             ) : (
               <div className="px-7 py-6 max-w-4xl mx-auto space-y-0 w-full">
                 {messages.map((msg, i) => (
-                  <div key={i} className="wb-msg" style={{ animationDelay: `${Math.min(i * 15, 60)}ms` }}>
+                  <div
+                    key={i}
+                    className="wb-msg"
+                    style={{
+                      animationDelay: `${Math.min(i * 15, 60)}ms`,
+                      display: msg.actionButtons && msg.buttonsUsed ? 'none' : undefined,
+                    }}
+                  >
                     {msg.role === 'user' ? (
                       /* ── User message ─────────────────────────────── */
                       <div className="flex justify-end mb-4">
