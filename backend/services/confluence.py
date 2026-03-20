@@ -408,9 +408,30 @@ class ConfluenceClient:
         # Surfacing that line first ensures the LLM sees the relevant data even
         # when the page is truncated.
         if date_filter:
+            # Build equivalent representations of the same date so we match
+            # any common format the Confluence page might use:
+            # e.g. "03-19-2026" also tried as "2026-03-19" and "03/19/2026"
+            from datetime import datetime as _dt
+            _date_variants = [date_filter]
+            for _fmt_in in ("%m-%d-%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
+                try:
+                    _parsed = _dt.strptime(date_filter, _fmt_in).date()
+                    _date_variants = list({
+                        date_filter,
+                        _parsed.strftime("%m-%d-%Y"),
+                        _parsed.strftime("%Y-%m-%d"),
+                        _parsed.strftime("%m/%d/%Y"),
+                        _parsed.strftime("%d-%m-%Y"),
+                        # Short forms: M/D/YY
+                        str(_parsed.month) + "/" + str(_parsed.day) + "/" + str(_parsed.year)[-2:],
+                    })
+                    break
+                except ValueError:
+                    continue
+
             date_lines = [
                 ln.strip() for ln in page_text.splitlines()
-                if date_filter in ln and ln.strip()
+                if any(v in ln for v in _date_variants) and ln.strip()
             ]
             if date_lines:
                 # Include surrounding context: grab header row (first non-empty line)

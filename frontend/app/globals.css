@@ -8,41 +8,41 @@
 
   /* ═══════════════════════════════════════════════════════════════════════════
      LIGHT MODE — :root (default)
-     Palette: warm ivory/graphite family — premium enterprise feel.
-     Warm off-white base, deep warm charcoal text, clear layer separation.
-     Sidebar/topbar use warm-white (#FAFAF7) to float above the ivory page.
+     Palette: Twilight Fog — cool blue-gray family, original mustard accent.
+     Inverts the dark mode's navy depth into cool misty surfaces.
+     Uses the exact same #D4A847 mustard as dark mode — no gold shift.
      ═══════════════════════════════════════════════════════════════════════════ */
   :root {
     color-scheme: light;
 
     /* ── Backgrounds & surfaces ─────────────────────────────────────────── */
-    --bg-page:        #F2EFEA;   /* warm ivory — rich base, not sterile white  */
-    --bg-card:        #FAFAF7;   /* warm white cards — elevated above page bg  */
-    --bg-surface:     #EDEBE6;   /* table headers, input backgrounds           */
-    --bg-hover:       #E5E2DC;   /* nav hover, row hover                       */
-    --bg-active:      #D9D5CD;   /* active nav, selected states                */
+    --bg-page:        #D8DDE8;   /* twilight fog canvas — cool blue-gray base  */
+    --bg-card:        #EDF0F6;   /* elevated surfaces — near-white cool tint   */
+    --bg-surface:     #E2E6EF;   /* table headers, input backgrounds           */
+    --bg-hover:       #D0D6E4;   /* nav hover, row hover                       */
+    --bg-active:      #C8D0E0;   /* active nav, selected states                */
 
     /* ── Borders ────────────────────────────────────────────────────────── */
-    --border:         #DDD9D2;   /* standard borders — warm soft gray          */
-    --border-strong:  #B8B2AA;   /* focus / hover emphasis                     */
+    --border:         #C5CCDB;   /* cool blue-gray border                      */
+    --border-strong:  #B0BCCF;   /* focus / hover emphasis                     */
 
     /* ── Text ───────────────────────────────────────────────────────────── */
-    --text-primary:   #1C1A17;   /* deep warm charcoal — rich, high contrast   */
-    --text-secondary: #3D3A35;   /* warm dark gray — labels, clearly readable  */
-    --text-muted:     #6B6660;   /* warm medium gray — visible secondary info  */
-    --text-hint:      #9E9890;   /* warm light gray — placeholder, still clear */
+    --text-primary:   #0B1220;   /* deep cool navy-black — high contrast       */
+    --text-secondary: #253550;   /* cool dark blue-gray — labels               */
+    --text-muted:     #506080;   /* twilight blue-gray — secondary info        */
+    --text-hint:      #7A90A8;   /* light cool gray — placeholder              */
 
-    /* ── Brand accent (mustard — darkened for light-bg contrast) ────────── */
-    --accent-cool:    #9E6B18;
-    --accent-cool-bg: #FEF0D0;
+    /* ── Brand accent — EXACT DARK MODE MUSTARD, UNCHANGED ─────────────── */
+    --accent-cool:    #D4A847;
+    --accent-cool-bg: #EEE6CC;   /* rgba(212,168,71,0.14) on #EDF0F6          */
 
-    /* ── Semantic colors (deepened for light backgrounds) ───────────────── */
-    --amber:          #C96A00;
-    --amber-bg:       #FFF7E6;
-    --red:            #C41E1E;
-    --red-bg:         #FEF0F0;
-    --blue:           #1D4ED8;
-    --blue-bg:        #EDF3FF;
+    /* ── Semantic colors ────────────────────────────────────────────────── */
+    --amber:          #B87700;
+    --amber-bg:       #F2E8CC;
+    --red:            #C01C1C;
+    --red-bg:         #F2DADA;
+    --blue:           #1A5BB0;
+    --blue-bg:        #D8E6F5;
 
     /* ── Typography & radius ────────────────────────────────────────────── */
     --radius:         8px;
@@ -52,66 +52,66 @@
     --mono:           'JetBrains Mono', 'Fira Code', monospace;
 
     /* ── Glass effects ──────────────────────────────────────────────────── */
-    --glass-bg:       rgba(28,26,23,0.05);
-    --glass-border:   rgba(28,26,23,0.10);
-    --glass-shadow:   0 4px 16px rgba(30,25,15,0.10);
+    --glass-bg:       rgba(11,18,32,0.05);
+    --glass-border:   rgba(11,18,32,0.10);
+    --glass-shadow:   0 4px 16px rgba(10,20,50,0.12);
 
-    /* ── Shadows (warm-tinted for ivory surfaces) ───────────────────────── */
-    --shadow-small:   0 1px 3px rgba(30,25,15,0.09), 0 1px 2px rgba(30,25,15,0.06);
-    --shadow-medium:  0 4px 12px rgba(30,25,15,0.09), 0 2px 4px rgba(30,25,15,0.06);
-    --shadow-large:   0 8px 28px rgba(30,25,15,0.12), 0 4px 8px rgba(30,25,15,0.07);
+    /* ── Shadows (cool-tinted for blue-gray surfaces) ───────────────────── */
+    --shadow-small:   0 1px 3px rgba(10,20,50,0.09), 0 1px 2px rgba(10,20,50,0.06);
+    --shadow-medium:  0 4px 12px rgba(10,20,50,0.09), 0 2px 4px rgba(10,20,50,0.06);
+    --shadow-large:   0 8px 28px rgba(10,20,50,0.12), 0 4px 8px rgba(10,20,50,0.07);
 
     /* ── Legacy compat aliases ──────────────────────────────────────────── */
-    --bg-primary:        #F2EFEA;
-    --bg-secondary:      #FAFAF7;
-    --bg-tertiary:       #EDEBE6;
-    --accent-primary:    #1C1A17;
-    --accent-secondary:  #3D3A35;
-    --accent-tertiary:   #6B6660;
-    --text-muted-legacy: #6B6660;
-    --border-subtle:     #DDD9D2;
-    --border-muted:      #DDD9D2;
-    --border-accent:     #B8B2AA;
-    --success:           #9E6B18;
+    --bg-primary:        #D8DDE8;
+    --bg-secondary:      #EDF0F6;
+    --bg-tertiary:       #E2E6EF;
+    --accent-primary:    #0B1220;
+    --accent-secondary:  #253550;
+    --accent-tertiary:   #506080;
+    --text-muted-legacy: #506080;
+    --border-subtle:     #C5CCDB;
+    --border-muted:      #C5CCDB;
+    --border-accent:     #B0BCCF;
+    --success:           #D4A847;
     --green:             var(--accent-cool);
     --green-bg:          var(--accent-cool-bg);
-    --warning:           #C96A00;
-    --error:             #C41E1E;
+    --warning:           #B87700;
+    --error:             #C01C1C;
 
-    /* ── Tailwind HSL compat (light — warm ivory/graphite) ──────────────── */
-    --background:              38 12% 93%;    /* warm ivory page              */
-    --foreground:              33 10% 10%;    /* deep warm charcoal           */
-    --card:                    38 14% 97%;    /* warm white card              */
-    --card-foreground:         33 10% 10%;
-    --popover:                 38 14% 97%;
-    --popover-foreground:      33 10% 10%;
-    --primary:                 33 10% 10%;
-    --primary-foreground:      38 12% 93%;
-    --secondary:               30 8% 22%;     /* warm dark gray               */
-    --secondary-foreground:    38 12% 93%;
-    --muted:                   36 11% 91%;    /* warm surface                 */
-    --muted-foreground:        27 7% 40%;     /* warm muted text              */
-    --accent:                  36 11% 91%;
-    --accent-foreground:       33 10% 10%;
+    /* ── Tailwind HSL compat (light — twilight fog cool blue-gray) ───────── */
+    --background:              221 18% 87%;   /* #D8DDE8                      */
+    --foreground:              223 50% 10%;   /* #0B1220                      */
+    --card:                    220 30% 95%;   /* #EDF0F6                      */
+    --card-foreground:         223 50% 10%;
+    --popover:                 220 30% 95%;
+    --popover-foreground:      223 50% 10%;
+    --primary:                 223 50% 10%;
+    --primary-foreground:      221 18% 87%;
+    --secondary:               220 22% 91%;   /* #E2E6EF surface              */
+    --secondary-foreground:    223 50% 10%;
+    --muted:                   220 22% 91%;
+    --muted-foreground:        218 33% 40%;   /* #506080                      */
+    --accent:                  220 22% 91%;
+    --accent-foreground:       223 50% 10%;
     --destructive:             0 72% 45%;
     --destructive-foreground:  0 0% 100%;
-    --input:                   36 11% 91%;
-    --ring:                    33 10% 10%;
-    --sidebar:                 38 14% 97%;    /* warm white — elevated above page */
-    --sidebar-foreground:      33 10% 10%;
-    --sidebar-primary:         33 10% 10%;
-    --sidebar-primary-foreground: 38 12% 93%;
-    --sidebar-accent:          38 12% 93%;    /* warm ivory hover in sidebar  */
-    --sidebar-accent-foreground: 33 10% 10%;
-    --sidebar-border:          35 12% 87%;
-    --sidebar-ring:            33 10% 10%;
+    --input:                   220 22% 91%;
+    --ring:                    223 50% 10%;
+    --sidebar:                 220 30% 95%;   /* elevated card surface        */
+    --sidebar-foreground:      223 50% 10%;
+    --sidebar-primary:         223 50% 10%;
+    --sidebar-primary-foreground: 221 18% 87%;
+    --sidebar-accent:          220 18% 88%;   /* hover in sidebar             */
+    --sidebar-accent-foreground: 223 50% 10%;
+    --sidebar-border:          220 16% 80%;   /* #C5CCDB                      */
+    --sidebar-ring:            223 50% 10%;
 
-    /* ── Chart colors (light) ───────────────────────────────────────────── */
-    --chart-1: 34 72% 36%;
-    --chart-2: 217 91% 45%;
+    /* ── Chart colors (twilight fog light) ──────────────────────────────── */
+    --chart-1: 43 65% 50%;    /* mustard gold                                 */
+    --chart-2: 217 68% 40%;   /* deep blue                                    */
     --chart-3: 45 93% 42%;
     --chart-4: 0 72% 45%;
-    --chart-5: 228 18% 48%;
+    --chart-5: 220 18% 50%;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════

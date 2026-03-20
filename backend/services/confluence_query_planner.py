@@ -39,6 +39,7 @@ import re
 import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +255,25 @@ class ConfluenceQueryPlanner:
     # ------------------------------------------------------------------
 
     def _extract_date(self, query: str) -> Optional[str]:
-        """Return the first date-like string found in the query."""
+        """Return the first date-like string found in the query.
+
+        Resolves relative terms (yesterday, today, last week) to actual
+        MM-DD-YYYY date strings so they can be matched against Confluence table rows.
+        """
+        q_lower = query.lower()
+        today = datetime.utcnow().date()
+
+        # --- Relative date terms ---
+        if "yesterday" in q_lower:
+            return (today - timedelta(days=1)).strftime("%m-%d-%Y")
+        if re.search(r"\btoday\b", q_lower):
+            return today.strftime("%m-%d-%Y")
+        if re.search(r"\bthis\s+week\b|\bcurrent\s+week\b", q_lower):
+            return today.strftime("%m-%d-%Y")
+        if re.search(r"\blast\s+week\b|\bpast\s+week\b", q_lower):
+            return (today - timedelta(days=7)).strftime("%m-%d-%Y")
+
+        # --- Explicit date patterns ---
         for pattern in _DATE_PATTERNS:
             m = re.search(pattern, query, re.IGNORECASE)
             if m:

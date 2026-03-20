@@ -174,7 +174,7 @@ export function NewLeftSidebar({
     <>
       {/* Sidebar — bg-card with border-right only, no shadow */}
       <aside
-        className="w-64 flex flex-col h-full overflow-hidden transition-all duration-500 ease-in-out"
+        className="w-64 flex flex-col h-full min-h-0 overflow-hidden transition-all duration-500 ease-in-out"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderRight: '1px solid var(--border)',
@@ -211,10 +211,10 @@ export function NewLeftSidebar({
           </AnimatePresence>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 overflow-hidden">
-          <div className="p-4 space-y-6">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-4 pb-6 space-y-5">
             {/* Navigation */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {/* Section label: text-hint, uppercase, 11px, letter-spacing 0.07em */}
               <h4
                 className="font-semibold uppercase px-1"
@@ -392,12 +392,10 @@ export function NewLeftSidebar({
               </div>
 
               {integrationsExpanded && (
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {[
                     { name: 'Jira',       label: 'Project Management', icon: Database,  coming: false },
                     { name: 'Confluence', label: 'Documentation',       icon: FileText,  coming: false },
-                    { name: 'QARP',       label: 'Quality Assurance',   icon: Shield,    coming: true  },
-                    { name: 'GitHub',     label: 'Code Repository',     icon: GitBranch, coming: false },
                   ].map(({ name, label, icon: Icon, coming }) => {
                     const conn = connections.find(c => c.name === name)
                     const isConnected = conn?.status === 'connected'
@@ -418,7 +416,7 @@ export function NewLeftSidebar({
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {!hasActiveConnections && (
                 <button
                   onClick={() => setShowSettings(true)}
@@ -430,7 +428,7 @@ export function NewLeftSidebar({
                 </button>
               )}
               {hasActiveConnections && (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <button
                     onClick={() => setShowSettings(true)}
                     className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-colors duration-200 active:scale-[0.98]"

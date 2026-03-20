@@ -64,7 +64,7 @@ function EmptyState({
   const prompts = [
     'Show open bugs in HCAT sprint',
     'Who is the reporter for HCAT-2034?',
-    'Summarize this week\'s GitHub PRs',
+    'Show sprint velocity for last 3 sprints',
     'Leadership insights for Q1',
   ]
   return (
@@ -82,7 +82,7 @@ function EmptyState({
         WorkBuddy
       </h3>
       <p className="text-sm leading-relaxed max-w-[260px] mb-8" style={{ color: textSecondary }}>
-        Ask anything about Jira, Confluence, GitHub, or get AI-powered leadership insights.
+        Ask anything about Jira, Confluence, or get AI-powered leadership insights.
       </p>
       <div className="grid grid-cols-1 gap-2 w-full max-w-[320px]">
         {prompts.map(p => (
@@ -752,7 +752,7 @@ export const ChatInterface = forwardRef<{ sendQuickMessage: (message: string) =>
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
               }}
-              placeholder="Ask anything about Jira, Confluence, GitHub…"
+              placeholder="Ask anything about Jira, Confluence…"
               disabled={isLoading}
               rows={1}
               className="w-full bg-transparent text-sm resize-none outline-none leading-relaxed min-h-[24px] max-h-[140px] premium-scrollbar px-4 pt-3.5 pb-2"

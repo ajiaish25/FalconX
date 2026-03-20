@@ -20,6 +20,45 @@ import html
 from services.rag_handler import get_handler as get_confluence_rag_handler
 from services.jira_rag_handler import get_jira_rag_handler
 from services.unified_rag_handler import get_unified_rag_handler, SourceType
+from services.confluence_query_planner import ConfluenceQueryPlanner
+
+# Singleton query planner (stateless, cheap to create once)
+_confluence_query_planner = ConfluenceQueryPlanner()
+
+# ---------------------------------------------------------------------------
+# AI Search Planner — system prompt (module-level to avoid rebuilding per call)
+# ---------------------------------------------------------------------------
+AI_PLAN_SEARCH_SYSTEM_PROMPT = """You are an expert search planner for a project management assistant connected to Confluence and Jira. Your job is NOT to answer the question — only to produce a structured JSON search plan so the system knows exactly where to look.
+
+## Confluence spaces available
+IS  – Intelligence Suite (NDP, SSBYOD projects)
+EMT – Engineering Modernization Team (DMS Modern Enablement, automation tracking)
+DMS – DMS project documentation
+
+## Rules
+1. Identify whether the answer is in Confluence, Jira, or both.
+2. For Confluence: produce 1–3 short, focused search terms — each should be a page title fragment or entity/workflow name (e.g., "GL Inquiry", "Automation DMS Modern Enablement"). Do NOT include question words, verbs, noise words, or the space key in the search terms.
+3. For Jira: produce 1–3 complete valid JQL queries, ordered most-specific first.
+4. Detect the extract_type:
+   - "table_cell"   → user wants a specific column value from a table row
+   - "factual"      → user wants a named fact (URL, branch, owner, ID)
+   - "page_summary" → user wants a description or overview
+   - "list"         → user wants a list of items
+   - "count"        → user wants a number
+5. For "table_cell" or "factual", populate extract_field (the column/attribute name, e.g. "Master Repo URL") and row_identifier (the row label, e.g. "GL Inquiry").
+6. Set space to the detected space key, or null if unknown.
+
+## Output — return ONLY valid JSON, no markdown fences, no extra text:
+{
+  "reasoning": "<one-sentence chain-of-thought>",
+  "source": "confluence",
+  "space": "<space key or null>",
+  "confluence_search_queries": ["<term1>", "<term2>"],
+  "jql_queries": [],
+  "extract_type": "table_cell",
+  "extract_field": "<column name or null>",
+  "row_identifier": "<row label or null>"
+}"""
 
 # Load environment variables
 load_dotenv(os.path.join(os.path.dirname(__file__), 'config.env'), override=True)
@@ -2113,11 +2152,27 @@ Your response:"""
                         "source": "fallback_error"
                     }
         
+        # Use QueryPlanner to detect table/factual lookups on Confluence pages.
+        # e.g. "which Jira IDs were fixed yesterday in GL Enquiry workflow"
+        # → intent=table_lookup, target_page="GL Enquiry Workflow"
+        # These queries contain "jira" but are really asking about a Confluence table.
+        _qp_plan = _confluence_query_planner.plan(user_query)
+        has_table_lookup_intent = (
+            _qp_plan.intent in ("table_lookup", "factual_lookup")
+            and _qp_plan.target_page is not None
+        )
+        if has_table_lookup_intent:
+            logger.info(
+                f"[QueryPlanner] Detected {_qp_plan.intent!r} on page "
+                f"'{_qp_plan.target_page}' — routing to Confluence first"
+            )
+
         # Determine if this should be a Confluence-first search (defined before Jira-first check)
         should_search_confluence_first = (
+            has_table_lookup_intent or  # QueryPlanner: table/factual lookup on specific page
             has_confluence_priority or  # Priority keywords always trigger Confluence
-            has_confluence_check or     # NEW: Explicit "check in confluence" phrases
-            is_confluence_query or 
+            has_confluence_check or     # Explicit "check in confluence" phrases
+            is_confluence_query or
             (has_confluence_pattern and not is_jira_query) or
             (has_document_terms and not is_jira_query and '=' not in query_lower and '-' not in query_lower)
         )
@@ -2910,6 +2965,35 @@ Your response:"""
                     "total_count": total_count
                 }
             else:
+                # Zero results — AI planner retry with alternative JQL queries
+                _jira_ai_plan = await self._ai_plan_search(user_query)
+                if _jira_ai_plan and len(_jira_ai_plan.get("jql_queries", [])) > 1:
+                    for _alt_jql in _jira_ai_plan["jql_queries"][1:]:
+                        logger.info(f"[AIPlanner] Jira retry JQL: {_alt_jql}")
+                        try:
+                            _alt_jql_result = await self._execute_jql(
+                                _alt_jql, query_analysis.get("intent"), original_query=user_query
+                            )
+                            if isinstance(_alt_jql_result, dict) and _alt_jql_result.get('results'):
+                                _alt_results = _alt_jql_result['results']
+                                _alt_count = _alt_jql_result.get('total_count', len(_alt_results))
+                                _alt_count_only = _alt_jql_result.get('is_count_only', False)
+                                _alt_response = await self._generate_text_response(
+                                    user_query, _alt_results, query_analysis, total_count=_alt_count
+                                )
+                                logger.info(f"[AIPlanner] Jira retry succeeded: {len(_alt_results)} results")
+                                return {
+                                    "jql": _alt_jql,
+                                    "response": _alt_response,
+                                    "data": _alt_results,
+                                    "intent": query_analysis.get("intent"),
+                                    "success": True,
+                                    "source": "jira",
+                                    "is_count_only": _alt_count_only,
+                                    "total_count": _alt_count
+                                }
+                        except Exception as _je:
+                            logger.warning(f"[AIPlanner] Jira retry JQL failed: {_je}")
                 return {
                     "jql": query_analysis["jql"],
                     "response": f"No Jira issues found for '{user_query}'",
@@ -5897,6 +5981,27 @@ You can browse all team members, view their profiles, and find contact informati
                         search_query = re.sub(r'\b(show\s+me|get|find|give\s+me|can\s+you|please|details|from|the|intelligent\s+suite|IS|space|project)\b', '', user_query, flags=re.IGNORECASE).strip()
 
                     search_query = ' '.join(search_query.split())
+
+                    # --- AI Planner (preferred) → regex planner (fallback) ---
+                    _ai_plan = await self._ai_plan_search(user_query, space_key=space_key)
+                    if _ai_plan and _ai_plan.get("confluence_search_queries"):
+                        search_query = _ai_plan["confluence_search_queries"][0]
+                        logger.info(f"[AIPlanner] Space search term: '{search_query}'")
+                    else:
+                        # Fallback: legacy regex planner
+                        _qp_sp = _confluence_query_planner.plan(user_query, space=space_key)
+                        if _qp_sp.target_page:
+                            _qp_term = _qp_sp.target_page
+                            _qp_term = re.sub(
+                                r'\s+(?:in|for|on|from)\s+' + re.escape(space_key) + r'\b',
+                                '', _qp_term, flags=re.IGNORECASE
+                            ).strip()
+                            _qp_term = re.sub(r'\b' + re.escape(space_key) + r'\b', '', _qp_term, flags=re.IGNORECASE).strip()
+                            _qp_term = ' '.join(_qp_term.split())
+                            if _qp_term and len(_qp_term) >= 3:
+                                search_query = _qp_term
+                                logger.info(f"[QueryPlanner] Space search using smart term: '{search_query}'")
+
                     logger.info(f"Searching for '{search_query}' in space {space_key}")
 
                     # ---- Index-first: try vector store filtered by space ----
@@ -5953,8 +6058,36 @@ You can browse all team members, view their profiles, and find contact informati
                     except Exception as _ie:
                         logger.warning(f"⚠️ Index space search failed: {_ie}")
                     # ---- Fallback: live CQL search in space ----
-                    space_results = await self.confluence_client.search_in_space(search_query, space=space_key, limit=10)
-                    
+                    if _ai_plan and len(_ai_plan.get("confluence_search_queries", [])) > 1:
+                        space_results = await self._execute_ai_confluence_searches(
+                            _ai_plan["confluence_search_queries"], space_key
+                        )
+                    else:
+                        space_results = await self.confluence_client.search_in_space(search_query, space=space_key, limit=10)
+
+                    # ---- Extra fallback: broaden to full-text search if space search empty ----
+                    if not space_results:
+                        logger.info(f"No results in space {space_key} for '{search_query}', trying broader full-text search...")
+                        try:
+                            space_results = await self.confluence_client.search(search_query, limit=10)
+                            if space_results:
+                                logger.info(f"Broader full-text search found {len(space_results)} results")
+                        except Exception as _fe:
+                            logger.warning(f"Broader full-text search failed: {_fe}")
+
+                    # ---- Extra fallback: try with individual keywords ----
+                    if not space_results and len(search_query.split()) > 1:
+                        for keyword in search_query.split():
+                            if len(keyword) >= 4:
+                                try:
+                                    kw_results = await self.confluence_client.search_in_space(keyword, space=space_key, limit=10)
+                                    if kw_results:
+                                        space_results = kw_results
+                                        logger.info(f"Keyword fallback '{keyword}' found {len(kw_results)} results in {space_key}")
+                                        break
+                                except Exception:
+                                    pass
+
                     if space_results:
                         base_url = self.confluence_client.cfg.base_url if self.confluence_client else ""
                         display_url = f"{base_url}/display/{space_key}"
@@ -5990,8 +6123,26 @@ You can browse all team members, view their profiles, and find contact informati
                                 enriched_results.append(result)
                         
                         # Generate response with full page content
-                        response = await self._generate_confluence_response(user_query, enriched_results)
-                        
+                        if _ai_plan:
+                            _date_f = ""
+                            _col_f  = _ai_plan.get("extract_field") or ""
+                            _hint   = f"TASK: {_ai_plan.get('extract_type', 'factual').upper()} lookup.\n"
+                            if _ai_plan.get("row_identifier"):
+                                _hint += f"ROW IDENTIFIER: {_ai_plan['row_identifier']}\n"
+                            if _col_f:
+                                _hint += f"EXTRACT FIELD: {_col_f}\n"
+                        else:
+                            _sp_plan = _confluence_query_planner.plan(user_query)
+                            _date_f  = _sp_plan.date_filter or ""
+                            _col_f   = _sp_plan.column_filter or ""
+                            _hint    = _sp_plan.build_llm_hint()
+                        response = await self._generate_confluence_response(
+                            user_query, enriched_results,
+                            date_filter=_date_f,
+                            column_filter=_col_f,
+                            llm_hint=_hint,
+                        )
+
                         # Add space link at the end
                         response += f"\n\n**{space_key} Space:** {display_url}"
                         
@@ -6005,23 +6156,20 @@ You can browse all team members, view their profiles, and find contact informati
                             "navigation_url": display_url
                         }
                     else:
-                        # No results found in space, but still provide space link
+                        # No results found in any search, but still provide space link
                         base_url = self.confluence_client.cfg.base_url if self.confluence_client else ""
                         display_url = f"{base_url}/display/{space_key}"
-                        response = f"""Documentation Search
+                        response = f"""**Confluence Search**
 
-Query: {search_query}
-Space: {space_key}
+I searched for **"{search_query}"** in the {space_key} space and across Confluence but didn't find matching pages.
 
-Status: No matching pages found in {space_key} space.
+**Browse {space_key} Space:** {display_url}
 
-Browse {space_key} Space:
-{display_url}
-
-Suggestions:
-  - Try different search terms
-  - Browse the space directly to find what you're looking for
-  - The content might be in a different space or have a different name"""
+**Suggestions:**
+- Try rephrasing your query with the exact page title
+- The page might be in a different Confluence space
+- Browse the space directly to locate the content
+- Make sure the Confluence index is up to date (re-index if needed)"""
                         return {
                             "jql": f"confluence_search_in_space:{space_key}:{search_query}",
                             "response": response,
@@ -6058,9 +6206,30 @@ Available in this space:
                         "navigation_url": display_url
                     }
             
-            # Extract search terms from the query
-            search_terms = self._extract_confluence_search_terms(user_query)
-            logger.info(f"Extracted search terms: '{search_terms}'")
+            # --- AI Planner (preferred) → regex planner (fallback) ---
+            _ai_plan = await self._ai_plan_search(user_query)
+            if _ai_plan and _ai_plan.get("confluence_search_queries"):
+                search_terms = _ai_plan["confluence_search_queries"][0]
+                logger.info(f"[AIPlanner] General search term: '{search_terms}'")
+                # If planner detected a space not previously identified, use it
+                if not space_key and _ai_plan.get("space"):
+                    space_key = _ai_plan["space"]
+                    logger.info(f"[AIPlanner] Detected space from plan: {space_key}")
+                # Keep _plan available as None so response-hint code can check _ai_plan
+                _plan = None
+            else:
+                # Fallback: regex planner
+                search_terms = self._extract_confluence_search_terms(user_query)
+                logger.info(f"Extracted search terms: '{search_terms}'")
+                _plan = _confluence_query_planner.plan(user_query)
+                logger.info(
+                    f"[QueryPlanner] intent={_plan.intent!r}  page={_plan.target_page!r}  "
+                    f"date={_plan.date_filter!r}  col={_plan.column_filter!r}  "
+                    f"search_query={_plan.search_query!r}"
+                )
+                if _plan.target_page and _plan.search_query:
+                    search_terms = _plan.search_query
+                    logger.info(f"[QueryPlanner] Overriding search_terms → '{search_terms}'")
 
             # ----------------------------------------------------------------
             # COLD-START / BLOCKER CHECK
@@ -6259,9 +6428,15 @@ DO NOT:
 
             confluence_results = []
 
-            # Strategy 1: Search target space
-            logger.info(f"[CQL] Strategy 1: Searching {target_space} space with: '{search_terms}'")
-            confluence_results = await self.confluence_client.search_in_space(search_terms, space=target_space, limit=10)
+            # Strategy 1: Search target space (AI multi-query or single-query legacy)
+            if _ai_plan and len(_ai_plan.get("confluence_search_queries", [])) > 1:
+                logger.info(f"[AIPlanner] Strategy 1: Multi-query search in space={target_space}")
+                confluence_results = await self._execute_ai_confluence_searches(
+                    _ai_plan["confluence_search_queries"], target_space
+                )
+            else:
+                logger.info(f"[CQL] Strategy 1: Searching {target_space} space with: '{search_terms}'")
+                confluence_results = await self.confluence_client.search_in_space(search_terms, space=target_space, limit=10)
             logger.info(f"[CQL] Strategy 1 found {len(confluence_results)} results")
 
             # Strategy 2: Global search if space search failed
@@ -6338,7 +6513,24 @@ DO NOT:
                     "progress":   _progress
                 }
 
-            response = await self._generate_confluence_response(user_query, confluence_results)
+            if _ai_plan:
+                _date_f = ""
+                _col_f  = _ai_plan.get("extract_field") or ""
+                _hint   = f"TASK: {_ai_plan.get('extract_type', 'factual').upper()} lookup.\n"
+                if _ai_plan.get("row_identifier"):
+                    _hint += f"ROW IDENTIFIER: {_ai_plan['row_identifier']}\n"
+                if _col_f:
+                    _hint += f"EXTRACT FIELD: {_col_f}\n"
+            else:
+                _date_f = _plan.date_filter or ""
+                _col_f  = _plan.column_filter or ""
+                _hint   = _plan.build_llm_hint()
+            response = await self._generate_confluence_response(
+                user_query, confluence_results,
+                date_filter=_date_f,
+                column_filter=_col_f,
+                llm_hint=_hint,
+            )
             # Append indexing notice if index is mid-build
             if _indexing_notice:
                 response += _indexing_notice
@@ -6392,7 +6584,8 @@ DO NOT:
         multi_word_proper = re.findall(r'\b([A-Z][a-zA-Z0-9]*(?:\s+[A-Z][a-zA-Z0-9]*)+)\b', user_query)
 
         # --- Priority 2: Single proper nouns and uppercase abbreviations
-        single_proper = re.findall(r'\b([A-Z]{2,}|[A-Z][a-z]{2,})\b', user_query)
+        # Use `cleaned` (noise-stripped) so words like "What" from "What is" don't appear
+        single_proper = re.findall(r'\b([A-Z]{2,}|[A-Z][a-z]{2,})\b', cleaned)
         single_proper = [w for w in single_proper if w.lower() not in stop_words]
 
         # --- Priority 3: Remaining meaningful lowercase words
@@ -6409,6 +6602,9 @@ DO NOT:
             if phrase.lower() not in seen:
                 parts.append(phrase)
                 seen.add(phrase.lower())
+                # Also mark individual words so single_proper doesn't re-add them
+                for w in phrase.split():
+                    seen.add(w.lower())
 
         for word in single_proper:
             if word.lower() not in seen:
@@ -6430,8 +6626,105 @@ DO NOT:
 
         logger.debug(f"[SearchTerms] '{user_query}' → '{result}'")
         return result
-    
-    async def _generate_confluence_response(self, user_query: str, confluence_results: List[Dict]) -> str:
+
+    async def _ai_plan_search(
+        self,
+        user_query: str,
+        space_key: Optional[str] = None,
+        project_keys: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        One fast LLM call that reasons about the query and returns a structured
+        search plan (search terms, extract hints). Always returns None on any
+        failure so every caller can transparently fall back to the regex planner.
+        """
+        if not self.client:
+            return None
+        try:
+            context_hint = f"[Detected space: {space_key}]\n" if space_key else ""
+            if project_keys:
+                context_hint += f"[Jira projects: {', '.join(project_keys)}]\n"
+
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": AI_PLAN_SEARCH_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"{context_hint}Query: {user_query}"}
+                ],
+                max_tokens=400,
+                temperature=0.1,
+            )
+            raw = resp.choices[0].message.content.strip()
+            # Strip markdown fences the model may add despite instructions
+            raw = re.sub(r'^```(?:json)?\s*', '', raw, flags=re.MULTILINE)
+            raw = re.sub(r'\s*```$', '', raw, flags=re.MULTILINE)
+
+            plan = json.loads(raw)
+
+            # Basic schema validation — return None if broken
+            if not isinstance(plan.get("confluence_search_queries"), list):
+                return None
+            if not isinstance(plan.get("jql_queries"), list):
+                plan["jql_queries"] = []
+
+            logger.info(
+                f"[AIPlanner] source={plan.get('source')} space={plan.get('space')} "
+                f"queries={plan.get('confluence_search_queries')} "
+                f"extract={plan.get('extract_type')} field={plan.get('extract_field')} "
+                f"row={plan.get('row_identifier')} | {plan.get('reasoning', '')[:80]}"
+            )
+            return plan
+        except Exception as e:
+            logger.warning(f"[AIPlanner] Planning failed, using regex fallback: {e}")
+            return None
+
+    async def _execute_ai_confluence_searches(
+        self,
+        search_queries: List[str],
+        space_key: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Try each AI-planned search query sequentially; stop at first hit.
+        Returns deduplicated Confluence search results.
+        """
+        seen_ids: set = set()
+        collected: List[Dict] = []
+
+        for sq in search_queries:
+            if not sq or len(sq.strip()) < 2:
+                continue
+            try:
+                if space_key:
+                    results = await self.confluence_client.search_in_space(
+                        sq, space=space_key, limit=10
+                    )
+                else:
+                    results = await self.confluence_client.search(sq, limit=10)
+
+                for r in results:
+                    rid = (r.get('content') or {}).get('id', '')
+                    if rid and rid not in seen_ids:
+                        seen_ids.add(rid)
+                        collected.append(r)
+
+                if collected:
+                    logger.info(
+                        f"[AIPlanner] '{sq}' space={space_key} → {len(results)} hits"
+                    )
+                    break  # first successful query is sufficient
+            except Exception as e:
+                logger.warning(f"[AIPlanner] Search '{sq}' failed: {e}")
+
+        return collected
+
+    async def _generate_confluence_response(
+        self,
+        user_query: str,
+        confluence_results: List[Dict],
+        date_filter: str = "",
+        column_filter: str = "",
+        llm_hint: str = "",
+    ) -> str:
         """Generate AI response for Confluence search results (CQL path)"""
         if not self.client:
             return self._basic_confluence_response(confluence_results)
@@ -6481,11 +6774,13 @@ DO NOT:
                     # Apply relevance-based extraction to get the most query-relevant sections
                     MAX_PAGE_CONTENT = 2500
                     if page_body:
-                        # Use smart relevance extraction instead of simple truncation
+                        # Use smart relevance extraction with date/column filters
                         content_preview = self.confluence_client.extract_relevant_content(
                             page_text=page_body,
                             query=user_query,
-                            max_chars=MAX_PAGE_CONTENT
+                            max_chars=MAX_PAGE_CONTENT,
+                            date_filter=date_filter,
+                            column_filter=column_filter,
                         )
                     else:
                         excerpt = result.get('excerpt', '')[:600] + "..." if result.get('excerpt') else "No content available"
@@ -6516,11 +6811,17 @@ DO NOT:
             if len(data_summary) > MAX_DATA_SUMMARY:
                 data_summary = data_summary[:MAX_DATA_SUMMARY] + "\n\n[Additional content truncated - showing most relevant results]"
 
-            system_prompt = """You are a precise AI assistant that answers questions from Confluence documentation.
+            # If the query planner found a specific task (table lookup, factual lookup),
+            # inject that as a precise instruction at the top of the system prompt.
+            _task_instruction = ""
+            if llm_hint:
+                _task_instruction = f"\n\nSPECIFIC TASK:\n{llm_hint}\n"
 
+            system_prompt = f"""You are a precise AI assistant that answers questions from Confluence documentation.{_task_instruction}
 ANSWER STYLE — follow this exactly:
 - Start directly with the answer. No preamble like "Based on the content..." or "I found..."
-- Use **bold** for every key value, name, URL, branch name, or important term
+- Use **bold** for every key value, name, URL, Jira ID, branch name, or important term
+- For table lookups: list ALL matching Jira IDs / values as a bulleted list
 - Use `## Section Title` headers only when the answer covers multiple distinct topics
 - Use bullet points ( - ) for lists of 3+ items
 - One blank line between sections
@@ -6535,10 +6836,12 @@ DO NOT:
 - Add unnecessary caveats when the answer is clearly present in the content
 - Use long preambles before the actual answer
 
-EXAMPLE of correct output for "what is the GL Inquiry branch?":
-The internal branch for **GL Inquiry** is **me-gl-main**.
+EXAMPLE of correct output for "what Jira IDs were fixed yesterday in GL Enquiry workflow?":
+Jira IDs fixed on **03-19-2026** in **GL Enquiry Workflow**:
+- **CDKGL-1234** — Fix null pointer in GL posting
+- **CDKGL-5678** — Resolve balance mismatch in period close
 
-📄 Source: Automation - DMS Modern Enablement (EMT Space)"""
+📄 Source: GL Enquiry Workflow (EMT Space)"""
 
             user_prompt = f"""User Question: "{user_query}"
 

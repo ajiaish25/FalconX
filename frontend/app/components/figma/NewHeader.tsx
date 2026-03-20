@@ -28,6 +28,7 @@ interface NewHeaderProps {
   setIntegrations?: (v: string[] | ((p: string[]) => string[])) => void
   uploadedDocReady?: boolean
   setUploadedDocReady?: (v: boolean) => void
+  activeView?: string
 }
 
 export function NewHeader({
@@ -37,6 +38,7 @@ export function NewHeader({
   setIntegrations = () => {},
   uploadedDocReady = false,
   setUploadedDocReady = () => {},
+  activeView = 'copilot',
 }: NewHeaderProps) {
   const { currentTheme } = useTheme()
   const c = currentTheme.colors
@@ -270,8 +272,8 @@ export function NewHeader({
         </motion.div>
       </div>
 
-      {/* Row 2: Integration filters — textured surface bar */}
-      <div
+      {/* Row 2: Integration filters — only on WorkBuddy page */}
+      {(activeView === 'copilot' || activeView === undefined) && <div
         className="flex items-center justify-between px-6 py-2.5 gap-4 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-surface) 35%, var(--bg-card) 70%, var(--border) 100%)',
@@ -291,10 +293,10 @@ export function NewHeader({
             Integrations:
           </span>
           <div className="flex items-center gap-3">
-            {['jira', 'confluence', 'qarp', 'github'].map((id) => {
+            {['jira', 'confluence'].map((id) => {
               const selected = integrations.includes(id)
-              const isComingSoon = id === 'qarp'
-              const label = id === 'qarp' ? 'Qarp' : id.charAt(0).toUpperCase() + id.slice(1)
+              const isComingSoon = false
+              const label = id.charAt(0).toUpperCase() + id.slice(1)
               return (
                 <label
                   key={id}
@@ -386,7 +388,7 @@ export function NewHeader({
           </div>
         </div>
         </div>
-      </div>
+      </div>}
     </header>
   )
 }

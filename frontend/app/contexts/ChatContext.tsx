@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react'
 
 export interface Message {
   role: 'user' | 'assistant'
@@ -17,6 +17,17 @@ export interface Message {
     source_type: string
   }>
   ragContextUsed?: number
+  actionButtons?: Array<{ label: string; source: string }>
+  originalQuery?: string
+  buttonsUsed?: boolean
+}
+
+export interface ChatSession {
+  id: string
+  title: string
+  messages: Message[]
+  createdAt: string
+  updatedAt: string
 }
 
 interface CachedIssueDetails {
@@ -28,6 +39,7 @@ interface CachedIssueDetails {
 interface ChatContextType {
   messages: Message[]
   addMessage: (message: Message) => void
+  updateMessage: (index: number, update: Partial<Message>) => void
   clearMessages: () => void
   isLoading: boolean
   setIsLoading: (loading: boolean) => void
@@ -36,106 +48,188 @@ interface ChatContextType {
   setLastIssueDetails: (details: CachedIssueDetails | null) => void
   lastProjectKey: string | null
   setLastProjectKey: (project: string | null) => void
+  sessions: ChatSession[]
+  currentSessionId: string
+  createNewSession: () => void
+  switchSession: (id: string) => void
+  deleteSession: (id: string) => void
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
-export function ChatProvider({ children }: { children: ReactNode }) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const chatInterfaceRef = useRef<{ sendQuickMessage: (message: string) => void }>(null)
-  const [lastIssueDetails, setLastIssueDetails] = useState<CachedIssueDetails | null>(null)
-  const [lastProjectKey, setLastProjectKey] = useState<string | null>(null)
+// ── helpers ────────────────────────────────────────────────────────────────
 
-  // Load messages from localStorage on mount
-  useEffect(() => {
-    console.log('ChatProvider: Initializing...')
-    const savedMessages = localStorage.getItem('chat-messages')
-    console.log('ChatProvider: Saved messages from localStorage:', savedMessages)
-    const savedIssue = localStorage.getItem('chat-last-issue')
-    const savedProject = localStorage.getItem('chat-last-project')
-    
-    if (savedMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages)
-        setMessages(parsedMessages)
-        console.log('ChatProvider: Loaded messages from localStorage:', parsedMessages.length)
-      } catch (error) {
-        console.error('ChatProvider: Failed to parse saved messages:', error)
-      }
-    } else {
-      console.log('ChatProvider: No saved messages found')
-    }
-    if (savedIssue) {
-      try {
-        const parsedIssue = JSON.parse(savedIssue)
-        setLastIssueDetails(parsedIssue)
-      } catch (error) {
-        console.error('ChatProvider: Failed to parse saved issue:', error)
-      }
-    }
-    if (savedProject) {
-      setLastProjectKey(savedProject)
-    }
-    setIsInitialized(true)
-    console.log('ChatProvider: Initialization complete')
-  }, [])
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2)
+}
 
-  // Save messages to localStorage whenever messages change (but not on initial load)
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('chat-messages', JSON.stringify(messages))
-      console.log('Saved messages to localStorage:', messages.length)
-    }
-  }, [messages, isInitialized])
+function generateTitle(text: string): string {
+  const trimmed = text.trim()
+  return trimmed.length > 45 ? trimmed.slice(0, 45) + '…' : trimmed
+}
 
-  // Persist last issue cache
-  useEffect(() => {
-    if (isInitialized) {
-      if (lastIssueDetails) {
-        localStorage.setItem('chat-last-issue', JSON.stringify(lastIssueDetails))
-      } else {
-        localStorage.removeItem('chat-last-issue')
-      }
-    }
-  }, [lastIssueDetails, isInitialized])
+function newSession(messages: Message[] = []): ChatSession {
+  const now = new Date().toISOString()
+  return { id: generateId(), title: 'New Chat', messages, createdAt: now, updatedAt: now }
+}
 
-  // Persist last project key
-  useEffect(() => {
-    if (isInitialized) {
-      if (lastProjectKey) {
-        localStorage.setItem('chat-last-project', lastProjectKey)
-      } else {
-        localStorage.removeItem('chat-last-project')
-      }
-    }
-  }, [lastProjectKey, isInitialized])
+function readLS<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
+}
 
-  const addMessage = (message: Message) => {
-    const messageWithTimestamp = {
-      ...message,
-      timestamp: new Date().toISOString()
-    }
-    setMessages(prev => [...prev, messageWithTimestamp])
-    console.log('ChatProvider: Added message:', messageWithTimestamp)
+function writeLS(key: string, value: unknown) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+}
+
+function removeLS(key: string) {
+  if (typeof window === 'undefined') return
+  try { localStorage.removeItem(key) } catch {}
+}
+
+// ── state initializers (run synchronously — no race condition) ──────────────
+
+function initSessions(): ChatSession[] {
+  // Try the new key first
+  const saved = readLS<ChatSession[]>('chat-sessions')
+  if (saved && Array.isArray(saved) && saved.length > 0) return saved
+
+  // Migrate legacy flat messages
+  const legacy = readLS<Message[]>('chat-messages')
+  if (legacy && legacy.length > 0) {
+    removeLS('chat-messages')
+    const session = newSession(legacy)
+    const firstUser = legacy.find(m => m.role === 'user')
+    if (firstUser) session.title = generateTitle(firstUser.content)
+    return [session]
   }
 
-  const clearMessages = () => {
-    setMessages([])
-    localStorage.removeItem('chat-messages')
-    // Also clear last-issue cache when chat is cleared
+  // Fresh start
+  return [newSession()]
+}
+
+function initCurrentSessionId(sessions: ChatSession[]): string {
+  const saved = typeof window !== 'undefined' ? localStorage.getItem('chat-current-session-id') : null
+  if (saved && sessions.find(s => s.id === saved)) return saved
+  return sessions[sessions.length - 1].id
+}
+
+// ── provider ───────────────────────────────────────────────────────────────
+
+export function ChatProvider({ children }: { children: ReactNode }) {
+  // State is initialised synchronously from localStorage — no race condition
+  const [sessions, setSessions] = useState<ChatSession[]>(initSessions)
+  const [currentSessionId, setCurrentSessionId] = useState<string>(
+    () => initCurrentSessionId(sessions)
+  )
+  const [isLoading, setIsLoading] = useState(false)
+  const chatInterfaceRef = useRef<{ sendQuickMessage: (message: string) => void }>(null)
+  const [lastIssueDetails, setLastIssueDetails] = useState<CachedIssueDetails | null>(
+    () => readLS<CachedIssueDetails>('chat-last-issue')
+  )
+  const [lastProjectKey, setLastProjectKey] = useState<string | null>(
+    () => typeof window !== 'undefined' ? localStorage.getItem('chat-last-project') : null
+  )
+
+  // ── persistence effects (write-only, always safe to fire) ──────────────
+
+  useEffect(() => {
+    writeLS('chat-sessions', sessions)
+  }, [sessions])
+
+  useEffect(() => {
+    localStorage.setItem('chat-current-session-id', currentSessionId)
+  }, [currentSessionId])
+
+  useEffect(() => {
+    if (lastIssueDetails) {
+      writeLS('chat-last-issue', lastIssueDetails)
+    } else {
+      removeLS('chat-last-issue')
+    }
+  }, [lastIssueDetails])
+
+  useEffect(() => {
+    if (lastProjectKey) {
+      localStorage.setItem('chat-last-project', lastProjectKey)
+    } else {
+      removeLS('chat-last-project')
+    }
+  }, [lastProjectKey])
+
+  // ── derived ────────────────────────────────────────────────────────────
+
+  const messages = sessions.find(s => s.id === currentSessionId)?.messages ?? []
+
+  // ── actions ────────────────────────────────────────────────────────────
+
+  const addMessage = useCallback((message: Message) => {
+    const msg: Message = { ...message, timestamp: message.timestamp ?? new Date().toISOString() }
+    setSessions(prev => prev.map(session => {
+      if (session.id !== currentSessionId) return session
+      const msgs = [...session.messages, msg]
+      const title = session.title === 'New Chat' && msg.role === 'user'
+        ? generateTitle(msg.content)
+        : session.title
+      return { ...session, messages: msgs, title, updatedAt: new Date().toISOString() }
+    }))
+  }, [currentSessionId])
+
+  const updateMessage = useCallback((index: number, update: Partial<Message>) => {
+    setSessions(prev => prev.map(session => {
+      if (session.id !== currentSessionId) return session
+      const msgs = session.messages.map((m, i) => i === index ? { ...m, ...update } : m)
+      return { ...session, messages: msgs, updatedAt: new Date().toISOString() }
+    }))
+  }, [currentSessionId])
+
+  const clearMessages = useCallback(() => {
+    setSessions(prev => prev.map(s =>
+      s.id === currentSessionId
+        ? { ...s, messages: [], title: 'New Chat', updatedAt: new Date().toISOString() }
+        : s
+    ))
     setLastIssueDetails(null)
     setLastProjectKey(null)
-    localStorage.removeItem('chat-last-issue')
-    localStorage.removeItem('chat-last-project')
-    console.log('Cleared messages from localStorage')
-  }
+  }, [currentSessionId])
+
+  const createNewSession = useCallback(() => {
+    const session = newSession()
+    setSessions(prev => [...prev, session])
+    setCurrentSessionId(session.id)
+  }, [])
+
+  const switchSession = useCallback((id: string) => {
+    setCurrentSessionId(id)
+  }, [])
+
+  const deleteSession = useCallback((id: string) => {
+    setSessions(prev => {
+      const remaining = prev.filter(s => s.id !== id)
+      if (remaining.length === 0) {
+        const fresh = newSession()
+        setCurrentSessionId(fresh.id)
+        return [fresh]
+      }
+      // If we're deleting the active session, switch to the most recent remaining
+      if (id === currentSessionId) {
+        setCurrentSessionId(remaining[remaining.length - 1].id)
+      }
+      return remaining
+    })
+  }, [currentSessionId])
 
   return (
     <ChatContext.Provider value={{
       messages,
       addMessage,
+      updateMessage,
       clearMessages,
       isLoading,
       setIsLoading,
@@ -143,7 +237,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       lastIssueDetails,
       setLastIssueDetails,
       lastProjectKey,
-      setLastProjectKey
+      setLastProjectKey,
+      sessions,
+      currentSessionId,
+      createNewSession,
+      switchSession,
+      deleteSession,
     }}>
       {children}
     </ChatContext.Provider>

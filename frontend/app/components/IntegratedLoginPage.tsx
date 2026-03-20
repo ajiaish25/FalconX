@@ -361,7 +361,7 @@ export function IntegratedLoginPage() {
                     display: 'flex'
                   }}
                 >
-                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPwd ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
               </div>
             </div>

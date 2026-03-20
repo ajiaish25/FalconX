@@ -3,7 +3,8 @@
     "allow": [
       "Bash(grep -v \"^\\\\s*//\")",
       "Bash(npx tsc:*)",
-      "Bash(grep -E \"\\\\.\\(tsx?|py\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx?|py\\)$\")",
+      "Bash(xargs grep:*)"
     ]
   }
 }

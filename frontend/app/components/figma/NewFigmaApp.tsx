@@ -48,8 +48,6 @@ function NewFigmaAppContent() {
   const [connections, setConnections] = useState<Connection[]>([
     { name: 'Jira', status: 'disconnected', type: 'atlassian' },
     { name: 'Confluence', status: 'disconnected', type: 'atlassian' },
-    { name: 'QARP', status: 'disconnected', type: 'atlassian' },
-    { name: 'GitHub', status: 'disconnected', type: 'github' }
   ])
 
   const toggleConnection = (index: number) => {
@@ -243,11 +241,12 @@ function NewFigmaAppContent() {
             setIntegrations={setIntegrations}
             uploadedDocReady={uploadedDocReady}
             setUploadedDocReady={setUploadedDocReady}
+            activeView={activeView}
           />
           </div>
           
           {/* Center Pane - Main Content */}
-          <main className="flex-1 min-h-0 pt-[7.5rem] overflow-hidden">
+          <main className={`flex-1 min-h-0 overflow-hidden ${activeView === 'copilot' || !activeView ? 'pt-24' : 'pt-14'}`}>
             <motion.div
               key={activeView}
               initial={{ opacity: 0, x: 30, scale: 0.98 }}
